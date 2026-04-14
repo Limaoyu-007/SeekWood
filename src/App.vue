@@ -1,7 +1,7 @@
 <template>
   <div class="app-wrapper">
     <!-- 开场动画 -->
-    <IntroSplash v-if="showIntro" @done="showIntro = false" />
+    <IntroSplash v-if="showIntro" @done="onIntroDone" />
 
     <!-- 层级 1: Three.js 3D 画布（底层），传入当前关卡配置 -->
     <ThreeViewer 
@@ -24,6 +24,15 @@
         <div class="nav-btn-group">
           <button class="nav-btn" @click="currentView = 'guide'">📖 图鉴</button>
           <button class="nav-btn accent" @click="currentView = 'assembly'">🏗 拼装</button>
+          <!-- 新增：音乐开关 -->
+          <button 
+            class="nav-btn music-toggle" 
+            :class="{ muted: audioSystem.isMuted.value }"
+            @click="toggleMusic"
+            title="背景音乐开关"
+          >
+            {{ audioSystem.isMuted.value ? '🔇 静音' : '🎵 音乐' }}
+          </button>
         </div>
 
         <!-- 关卡信息徽章 -->
@@ -85,6 +94,7 @@ import AIChatBox     from './components/AIChatBox.vue';
 import GuideView     from './components/GuideView.vue';
 import AssemblyView  from './components/AssemblyView.vue';
 import IntroSplash   from './components/IntroSplash.vue';
+import { audioSystem } from './utils/audioSystem';
 
 // ── 页面控制 ──────────────────────────────────────────
 const currentView = ref('game'); // 'game' | 'guide' | 'assembly'
@@ -95,13 +105,13 @@ const showIntro   = ref(true);
 const LEVELS = [
   {
     id: 1, name: '直榫', type: 'straight',
-    successEmoji: '🎉', successTitle: '巧夺天工！',
-    successDesc: '直榫是榫卯中最基础的形制，\n一凸一凹，严丝合缝，承载千年梁柱之重。',
+    successEmoji: '🎉', successTitle: '初窥门径！',
+    successDesc: '直榫是榫卯中最基础的形制，\n一凸一凹，严丝合缝，承载千年梁柱之重。\n你已迈出木匠之路的第一步。',
   },
   {
     id: 2, name: '燕尾榫', type: 'dovetail',
-    successEmoji: '🪶', successTitle: '匠心独运！',
-    successDesc: '榫头先旋转，再侧推入卯——自锁结构，名不虚传！',
+    successEmoji: '🪶', successTitle: '匠心初显！',
+    successDesc: '榫头先旋转，再侧推入卯——\n燕尾自锁，插入容易拔出难，名不虚传！',
   },
   {
     id: 3, name: '十字搭接', type: 'crosslap',
@@ -110,18 +120,18 @@ const LEVELS = [
   },
   {
     id: 4, name: '双榫', type: 'doubletenon',
-    successEmoji: '🏆', successTitle: '登峰造极！',
-    successDesc: '双榫同时对准两个卯眼，抗扭转能力倍增。\n四大榫卯尽数掌握，当属木匠大师！',
+    successEmoji: '🏆', successTitle: '双管齐下！',
+    successDesc: '双榫同时对准两个卯眼，抗扭转能力倍增。\n能驾驭双榫，已有几分木匠的功力。',
   },
   {
     id: 5, name: '双联卯眼', type: 'twojoint',
     successEmoji: '🎊', successTitle: '出神入化！',
-    successDesc: '两榫同时归位，一旋一插！\n恭喜通关全部五关——快去拼装模块搭建古建房架！',
+    successDesc: '两榫同时归位，一旋一插！\n独立操控多个构件，你的空间感知力已今非昔比。',
   },
   {
     id: 6, name: '半隐燕尾榫', type: 'stoppedDovetail',
-    successEmoji: '🛡️', successTitle: '神乎其技！',
-    successDesc: '半隐燕尾榫外表不露痕迹，内里却紧紧咬合。\n这是古建家具中平衡美感与强度的上佳选择。',
+    successEmoji: '🛡️', successTitle: '深藏不露！',
+    successDesc: '半隐燕尾榫外表不露痕迹，内里却紧紧咬合。\n这是古建家具中兼顾美感与强度的上佳选择。',
   },
   {
     id: 7, name: '粽角榫 (三碰肩)', type: 'miteredCorner',
@@ -130,18 +140,18 @@ const LEVELS = [
   },
   {
     id: 8, name: '勾挂榫 (云朵榫)', type: 'cloudJoint',
-    successEmoji: '☁️', successTitle: '如鱼得水！',
-    successDesc: '勾挂榫又称云纹榫，其钩状结构形成了天然的拉力锁。\n曲线优美且坚固无比，常用于圆桌和园林建筑。',
+    successEmoji: '☁️', successTitle: '行云流水！',
+    successDesc: '勾挂榫以钩状结构形成天然的拉力锁，\n曲线优美且坚固无比，常见于园林建筑与圆桌之间。',
   },
   {
     id: 9, name: '霸王枨 (带楔锁定)', type: 'paWangJoint',
     successEmoji: '👑', successTitle: '力拔山河！',
-    successDesc: '霸王枨不仅依靠S曲线分担压力，更妙在最后的楔子锁定。\n大件就位，小件固死——这便是复合拼装的精髓。',
+    successDesc: '霸王枨依靠S曲线分担压力，\n更妙在最后以楔子锁死——大件就位，小件固死，\n这便是复合拼装的精髓所在。',
   },
   {
     id: 10, name: '终极挑战：鲁班三才锁', type: 'lubanLock',
-    successEmoji: '💎', successTitle: '天工巧夺！',
-    successDesc: '恭喜你完成了全部十关挑战！\n鲁班锁三轴合一，自成方圆。这种绝学已流传两千年，现在你也是这门技艺的传承人。',
+    successEmoji: '💎', successTitle: '巧夺天工！',
+    successDesc: '恭喜你完成了全部十关挑战！\n鲁班锁三轴合一，自成方圆。\n这门流传两千年的绝学，今天由你亲手传承。',
   },
 ];
 
@@ -155,6 +165,17 @@ const levelKey = ref(0);
 const showSuccess = ref(false);
 const showChat    = ref(false);
 
+// ── 音频控制 ──────────────────────────────────────────
+const onIntroDone = () => {
+  showIntro.value = false;
+  audioSystem.resume(); // 进游戏即尝试开启音乐
+};
+
+const toggleMusic = () => {
+  audioSystem.toggleMute();
+  audioSystem.playClick();
+};
+
 // 拼装成功回调
 const onLevelPass = () => {
   showSuccess.value = true;
@@ -165,12 +186,14 @@ const goNextLevel = () => {
   currentLevelIndex.value++;
   levelKey.value++;         // 触发 ThreeViewer 重建
   showSuccess.value = false;
+  audioSystem.playClick();
 };
 
 // 重玩本关
 const replayLevel = () => {
   levelKey.value++;
   showSuccess.value = false;
+  audioSystem.playClick();
 };
 
 // 全部通关后重新开始
@@ -178,6 +201,7 @@ const restartGame = () => {
   currentLevelIndex.value = 0;
   levelKey.value++;
   showSuccess.value = false;
+  audioSystem.playClick();
 };
 </script>
 
@@ -376,6 +400,22 @@ const restartGame = () => {
   background: rgba(40, 120, 80, 0.4); 
   color: #a0ffcc; 
   border-color: rgba(120, 255, 180, 0.6);
+}
+
+.nav-btn.music-toggle {
+  border-color: rgba(200, 170, 90, 0.3);
+  color: rgba(200, 170, 90, 0.8);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.nav-btn.music-toggle.muted {
+  border-color: rgba(150, 60, 40, 0.45);
+  color: rgba(180, 80, 60, 0.8);
+  background: rgba(40, 10, 5, 0.4);
+}
+.nav-btn.music-toggle:hover {
+  transform: scale(1.05);
+  color: #f0d080;
+  background: rgba(139, 90, 30, 0.4);
 }
 
 /* ── 图鉴页滑入过渡 ── */

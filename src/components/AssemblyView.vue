@@ -160,6 +160,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { audioSystem } from '../utils/audioSystem';
 
 defineEmits(['back']);
 
@@ -210,6 +211,7 @@ const onKeyDown = (e) => {
   const key = e.key.toLowerCase();
   if (key === 'r') {
     currentRotDeg.value = (currentRotDeg.value + 90) % 360;
+    audioSystem.playClick();
     if (ghostMesh) {
       ghostMesh.rotation.y = (currentRotDeg.value * Math.PI) / 180;
     }
@@ -434,6 +436,7 @@ const deleteHovered = () => {
   if (idx !== -1) {
     placedMeshes.splice(idx, 1);
     placedParts.value.splice(idx, 1);
+    audioSystem.playClick();
   }
   hoveredMesh = null;
 };
@@ -463,6 +466,8 @@ const placePart = (pt_def, x, y, z) => {
   scene.add(mesh);
   placedMeshes.push(mesh);
   placedParts.value.push({ type: pt_def.id, mesh });
+  
+  audioSystem.playSnap();
 
   const startY = mesh.position.y;
   const startT = performance.now();
@@ -483,6 +488,7 @@ const placePart = (pt_def, x, y, z) => {
 // ── 虚影：选中构件类型时创建 / 切换时重建 ──────────────────────
 const selectPart = (typeId) => {
   selectedType.value = selectedType.value === typeId ? null : typeId;
+  audioSystem.playClick();
   rebuildGhost();
 };
 

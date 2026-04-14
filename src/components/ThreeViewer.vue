@@ -43,6 +43,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { buildLevel } from './ThreeLevelFactory';
 import * as Helpers from '../utils/threeHelpers';
+import { audioSystem } from '../utils/audioSystem';
 
 // ── Props & Emits ──────────────────────────────────────────────
 const props = defineProps({ level: { type: Object, required: true } });
@@ -168,8 +169,14 @@ const onKeyDown = (e) => {
   if (!active || active.placed) return;
 
   const step = Math.PI / 4;   // 45°
-  if (e.key === 'r' || e.key === 'R') active.mesh.rotation.y += step;
-  if (e.key === 'e' || e.key === 'E') active.mesh.rotation.y -= step;
+  if (e.key === 'r' || e.key === 'R') {
+    active.mesh.rotation.y += step;
+    audioSystem.playClick();
+  }
+  if (e.key === 'e' || e.key === 'E') {
+    active.mesh.rotation.y -= step;
+    audioSystem.playClick();
+  }
 
   // 白色旋转闪烁反馈
   active.mesh.traverse(o => {
@@ -294,6 +301,9 @@ const snapPiece = (piece) => {
   piece.mesh.position.copy(piece.target);
   piece.mesh.rotation.y = piece.targetRotY;
   placedCount.value++;
+  
+  // 播放物理扣合音效
+  audioSystem.playSnap();
 
   // 榫头：金色发光（用 emissive 叠加，保留原色以便 reset 还原）
   piece.mesh.traverse(o => {
