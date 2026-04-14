@@ -1,0 +1,12 @@
+/* 全局基础重置 */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  overflow: hidden; /* 防止出现滚动条影响游戏体验 */
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  background-color: #000;
+}
