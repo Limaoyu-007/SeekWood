@@ -81,8 +81,7 @@ const fetchAIResponse = async (userText) => {
                      '回答请用古朴口吻，精简幽默，每次不超过80字。' +
                      '遇到与建筑无关的问题，请婉拒并引导回榫卯话题。'
           },
-          ...history,
-          { role: 'user', content: userText }
+          ...history
         ],
         temperature: 0.75
       })

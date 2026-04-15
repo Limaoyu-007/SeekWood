@@ -34,6 +34,18 @@
       <button class="reset-btn" @click="resetAll">↺ 重置</button>
       <div class="rotate-hint">[ R ] 旋转 +45° &nbsp; [ E ] 旋转 -45°</div>
     </div>
+
+    <!-- 教程提示层 -->
+    <transition name="fade">
+      <div v-if="showTutorialTip" class="tutorial-tip-overlay">
+        <div class="tip-avatar">🧔🏻‍♂️</div>
+        <div class="tip-content">
+          <h4 class="tip-title">匠人提点</h4>
+          <p class="tip-text">{{ tutorialTipText }}</p>
+          <button class="tip-btn" @click="showTutorialTip = false">明白了</button>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -44,6 +56,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { buildLevel } from './ThreeLevelFactory';
 import * as Helpers from '../utils/threeHelpers';
 import { audioSystem } from '../utils/audioSystem';
+import { store } from '../store';
 
 // ── Props & Emits ──────────────────────────────────────────────
 const props = defineProps({ level: { type: Object, required: true } });
@@ -55,6 +68,10 @@ const isLoading    = ref(true);
 const totalPieces  = ref(1);
 const placedCount  = ref(0);
 const allTriggered = ref(false);
+
+// ── 教程状态 ─────────────────────────────────────────────
+const showTutorialTip = ref(false);
+const tutorialTipText = ref("");
 
 // ── Three.js 核心 ──────────────────────────────────────────────
 let renderer, scene, camera, controls, animationId;
@@ -131,6 +148,13 @@ const initThree = () => {
   window.addEventListener('keydown', onKeyDown);
 
   isLoading.value = false;
+  
+  // 教程引导逻辑
+  if (props.level.id === 1) {
+    showTutorialTip.value = true;
+    tutorialTipText.value = "这是最基础的直榫。左键拖拽深色构件，滚轮可以推拉深度。对准后它会‘咔哒’一声扣合入位。";
+  }
+
   animate();
 };
 
@@ -492,4 +516,55 @@ onBeforeUnmount(() => {
   font-size: 12px; color: rgba(200,160,80,0.55);
   letter-spacing: 1px; white-space: nowrap;
 }
+
+/* 教程提示层 */
+.tutorial-tip-overlay {
+  position: absolute;
+  top: 100px;
+  right: 32px;
+  width: 260px;
+  background: linear-gradient(135deg, #2d1c08, #1a0f04);
+  border: 1px solid #c89a5a;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  gap: 16px;
+  z-index: 100;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.8);
+  backdrop-filter: blur(12px);
+  animation: slide-in 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.tip-avatar {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+@keyframes slide-in {
+  from { transform: translateX(50px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.tip-title {
+  font-family: "楷体", serif;
+  color: #f0deb0;
+  margin: 0 0 6px 0;
+  font-size: 16px;
+}
+.tip-text {
+  color: rgba(200, 170, 90, 0.85);
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 0 12px 0;
+}
+.tip-btn {
+  background: #c89a5a;
+  color: #1a0f04;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.fade-enter-active, .fade-leave-active { transition: opacity 0.5s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

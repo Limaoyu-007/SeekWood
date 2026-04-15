@@ -32,6 +32,7 @@ const loadState = () => {
         inventory:         Array.isArray(parsed.inventory)         ? parsed.inventory         : [],
         unlockedBuildings: Array.isArray(parsed.unlockedBuildings) ? parsed.unlockedBuildings : [],
         currentPhase:      parsed.currentPhase || '3d-challenge',
+        hasSeenTutorial:   parsed.hasSeenTutorial || false,
       };
     }
   } catch (e) {
@@ -42,6 +43,7 @@ const loadState = () => {
     inventory:         [],  // 例如 ['straight', 'dovetail', 'crosslap']
     unlockedBuildings: [],  // 例如 ['huguang']
     currentPhase:      '3d-challenge',
+    hasSeenTutorial:   false,
   };
 };
 
@@ -54,6 +56,7 @@ watch(
     inventory:         [...store.inventory],
     unlockedBuildings: [...store.unlockedBuildings],
     currentPhase:      store.currentPhase,
+    hasSeenTutorial:   store.hasSeenTutorial,
   }),
   (snapshot) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
@@ -134,6 +137,15 @@ export const resetStore = () => {
   store.inventory.length = 0;
   store.unlockedBuildings.length = 0;
   store.currentPhase = '3d-challenge';
+  store.hasSeenTutorial = false;
   localStorage.removeItem(STORAGE_KEY);
   console.log('[Store] 🗑️ 状态已重置');
+};
+
+/**
+ * 标记教程已完成
+ */
+export const completeTutorial = () => {
+  store.hasSeenTutorial = true;
+  console.log('[Store] ✅ 教程已标记为完成');
 };

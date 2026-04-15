@@ -3,6 +3,13 @@
     <!-- 开场动画 -->
     <IntroSplash v-if="showIntro" @done="onIntroDone" />
 
+    <!-- 叙事对话层 -->
+    <StoryOverlay 
+      :active="showStory" 
+      :stories="tutorialStories" 
+      @finish="onStoryFinish"
+    />
+
     <!-- 隔离：当不在造办处阶段时，才展示 3D 收集相关的视图 -->
     <div v-if="currentView !== 'repair'" class="game-phase-wrapper">
       <!-- 层级 1: Three.js 3D 画布（底层），传入当前关卡配置 -->
@@ -22,6 +29,10 @@
 
         <!-- 右上角 UI 组合 -->
         <div class="top-right-ui">
+          <!-- 任务提示横幅 -->
+          <div v-if="activeTaskName" class="task-banner">
+            🎯 当前任务：制作【{{ activeTaskName }}】
+          </div>
           <!-- 导航按钮组 -->
           <div class="nav-btn-group">
             <button class="nav-btn" @click="currentView = 'guide'">📖 图鉴</button>
@@ -36,6 +47,8 @@
             >
               {{ audioSystem.isMuted.value ? '🔇 静音' : '🎵 音乐' }}
             </button>
+            <!-- 开发测试用：重置存档 -->
+            <button class="nav-btn" @click="handleReset" style="opacity: 0.7;" title="清除存档并刷新">↻ 重置</button>
           </div>
 
           <!-- 关卡信息徽章 -->
@@ -91,7 +104,7 @@
 
     <!-- 层级 6: 建筑修复（大匠造办） -->
     <transition name="slide-guide">
-      <BuildingRepairView v-if="currentView === 'repair'" @back="currentView = 'game'" />
+      <BuildingRepairView v-if="currentView === 'repair'" @back="currentView = 'game'" @go-workshop="handleGoWorkshop" />
     </transition>
   </div>
 </template>
@@ -104,11 +117,15 @@ import GuideView     from './components/GuideView.vue';
 import AssemblyView  from './components/AssemblyView.vue';
 import IntroSplash   from './components/IntroSplash.vue';
 import BuildingRepairView from './components/BuildingRepairView.vue';
+import StoryOverlay from './components/StoryOverlay.vue';
 import { audioSystem } from './utils/audioSystem';
-import { store, addJoint, setPhase } from './store';
+import { store, addJoint, setPhase, resetStore } from './store';
 
 // ── 页面控制 ──────────────────────────────────────────
-const currentView = ref(store.currentPhase === 'building-repair' ? 'repair' : 'game');
+// 初始视图：如果没看过教程，强制进入造办处（repair）
+const currentView = ref(
+  !store.hasSeenTutorial ? 'repair' : (store.currentPhase === 'building-repair' ? 'repair' : 'game')
+);
 
 // 全局状态对齐：监听 currentView 并更新 store 的阶段
 watch(currentView, (newView) => {
@@ -119,6 +136,14 @@ watch(currentView, (newView) => {
   }
 });
 const showIntro   = ref(true);
+const showStory   = ref(false);
+
+// 教程故事剧本
+const tutorialStories = [
+  "后生，你可算来了。瞧瞧这湖广会馆，往昔那是戏曲绕梁、八方来客，如今却已历三百年春秋，风雨侵蚀，梁柱微微晃动...",
+  "这中国古建筑的魂，全在这‘不施一钉’的榫卯之间。若是你能随我寻回那些流散的榫卯构件，定能让这百年戏台重现生机。",
+  "来，先看看这戏台底部的柱础。三百年前，那里的直榫可是由我亲手打磨。去试着触碰那受损之处吧。"
+];
 
 // ── 关卡数据表 ────────────────────────────────────────────────
 // 每一关定义自己的名称、说明、3D 参数，ThreeViewer 根据 level 对象渲染不同的榫卯
@@ -179,6 +204,20 @@ const currentLevelIndex = ref(0);
 const currentLevel      = computed(() => LEVELS[currentLevelIndex.value]);
 const hasNextLevel      = computed(() => currentLevelIndex.value < LEVELS.length - 1);
 
+// 目标任务提示
+const activeTaskName = ref('');
+
+// 从造办处跳转工坊处理
+const handleGoWorkshop = (targetJointType) => {
+  const targetIndex = LEVELS.findIndex(l => l.type === targetJointType);
+  if (targetIndex !== -1) {
+    currentLevelIndex.value = targetIndex;
+    levelKey.value++; // 强制刷新关卡
+    activeTaskName.value = LEVELS[targetIndex].name;
+  }
+  currentView.value = 'game';
+};
+
 // key 变化时强制重建 ThreeViewer（重置整个 3D 场景）
 const levelKey = ref(0);
 
@@ -189,11 +228,28 @@ const showChat    = ref(false);
 const onIntroDone = () => {
   showIntro.value = false;
   audioSystem.resume(); // 进游戏即尝试开启音乐
+  
+  // 如果没看过教程，开启故事模式
+  if (!store.hasSeenTutorial) {
+    showStory.value = true;
+  }
+};
+
+const onStoryFinish = () => {
+  showStory.value = false;
+  // 注意：此处不立刻 completeTutorial，而是等用户点击了第一个热区后再标记
 };
 
 const toggleMusic = () => {
   audioSystem.toggleMute();
   audioSystem.playClick();
+};
+
+const handleReset = () => {
+  if (confirm('确定要清除所有进度并重新体验新手引导吗？')) {
+    resetStore();
+    window.location.reload();
+  }
 };
 
 // 拼装成功回调：将当前关卡对应的榫卯存入全局背包
@@ -203,6 +259,10 @@ const onLevelPass = () => {
   const isNew = addJoint(jointType);
   if (isNew) {
     console.log(`🎒 新榫卯「${jointType}」已收入背包，当前背包:`, [...store.inventory]);
+  }
+  // 清除任务提示
+  if (activeTaskName.value === currentLevel.value.name) {
+    activeTaskName.value = '';
   }
   showSuccess.value = true;
 };
@@ -287,6 +347,26 @@ const restartGame = () => {
   gap: 16px;
   pointer-events: none;
   z-index: 25;
+}
+
+/* ── 任务横幅 ── */
+.task-banner {
+  background: rgba(180, 40, 40, 0.85);
+  border: 1px solid rgba(255, 100, 100, 0.6);
+  border-radius: 24px;
+  padding: 8px 16px;
+  color: #fff;
+  font-family: "楷体", serif;
+  font-size: 15px;
+  letter-spacing: 1px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 20px rgba(180, 40, 40, 0.4);
+  white-space: nowrap;
+  animation: slide-fade 0.5s ease-out;
+}
+@keyframes slide-fade {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 /* ── 关卡徽章 ── */
