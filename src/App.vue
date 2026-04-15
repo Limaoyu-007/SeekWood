@@ -3,76 +3,80 @@
     <!-- 开场动画 -->
     <IntroSplash v-if="showIntro" @done="onIntroDone" />
 
-    <!-- 层级 1: Three.js 3D 画布（底层），传入当前关卡配置 -->
-    <ThreeViewer 
-      :level="currentLevel"
-      :key="levelKey"
-      @assemble-success="onLevelPass"
-    />
+    <!-- 隔离：当不在造办处阶段时，才展示 3D 收集相关的视图 -->
+    <div v-if="currentView !== 'repair'" class="game-phase-wrapper">
+      <!-- 层级 1: Three.js 3D 画布（底层），传入当前关卡配置 -->
+      <ThreeViewer 
+        :level="currentLevel"
+        :key="levelKey"
+        @assemble-success="onLevelPass"
+      />
 
-    <!-- 层级 2: UI 覆盖层 -->
-    <div class="ui-overlay">
-      <!-- 标题 -->
-      <div class="title-block">
-        <h1 class="game-title">寻木·榫卯</h1>
-        <p class="game-sub">中·国·古·建·筑·益·智</p>
-      </div>
-
-      <!-- 右上角 UI 组合 -->
-      <div class="top-right-ui">
-        <!-- 导航按钮组 -->
-        <div class="nav-btn-group">
-          <button class="nav-btn" @click="currentView = 'guide'">📖 图鉴</button>
-          <button class="nav-btn accent" @click="currentView = 'assembly'">🏗 拼装</button>
-          <!-- 新增：音乐开关 -->
-          <button 
-            class="nav-btn music-toggle" 
-            :class="{ muted: audioSystem.isMuted.value }"
-            @click="toggleMusic"
-            title="背景音乐开关"
-          >
-            {{ audioSystem.isMuted.value ? '🔇 静音' : '🎵 音乐' }}
-          </button>
+      <!-- 层级 2: UI 覆盖层 -->
+      <div class="ui-overlay">
+        <!-- 标题 -->
+        <div class="title-block">
+          <h1 class="game-title">寻木·榫卯</h1>
+          <p class="game-sub">中·国·古·建·筑·益·智</p>
         </div>
 
-        <!-- 关卡信息徽章 -->
-        <div class="level-badge">
-          第 {{ currentLevel.id }} 关 · {{ currentLevel.name }}
-        </div>
-      </div>
+        <!-- 右上角 UI 组合 -->
+        <div class="top-right-ui">
+          <!-- 导航按钮组 -->
+          <div class="nav-btn-group">
+            <button class="nav-btn" @click="currentView = 'guide'">📖 图鉴</button>
+            <button class="nav-btn accent" @click="currentView = 'assembly'">🏗 拼装</button>
+            <button class="nav-btn accent" @click="currentView = 'repair'" style="border-color: rgba(200,80,60,0.5); color: #ffbba0;">🏛 造办处</button>
+            <!-- 新增：音乐开关 -->
+            <button 
+              class="nav-btn music-toggle" 
+              :class="{ muted: audioSystem.isMuted.value }"
+              @click="toggleMusic"
+              title="背景音乐开关"
+            >
+              {{ audioSystem.isMuted.value ? '🔇 静音' : '🎵 音乐' }}
+            </button>
+          </div>
 
-      <!-- 通关成功弹窗 -->
-      <transition name="toast-pop">
-        <div v-if="showSuccess" class="success-overlay">
-          <div class="success-card">
-            <div class="success-icon">{{ currentLevel.successEmoji }}</div>
-            <h2 class="success-title">{{ currentLevel.successTitle }}</h2>
-            <p class="success-desc">{{ currentLevel.successDesc }}</p>
-            <div class="action-row">
-              <!-- 如果有下一关就显示"下一关"，否则显示"通关" -->
-              <button v-if="hasNextLevel" class="action-btn primary" @click="goNextLevel">
-                下一关 →
-              </button>
-              <button v-else class="action-btn primary" @click="restartGame">
-                🏆 再挑战
-              </button>
-              <button class="action-btn secondary" @click="replayLevel">
-                ↺ 重玩本关
-              </button>
-            </div>
+          <!-- 关卡信息徽章 -->
+          <div class="level-badge">
+            第 {{ currentLevel.id }} 关 · {{ currentLevel.name }}
           </div>
         </div>
-      </transition>
-    </div>
 
-    <!-- 层级 3: AI 伴学聊天窗 -->
-    <div class="ai-box-wrapper">
-      <button class="ai-toggle-btn" @click="showChat = !showChat">
-        {{ showChat ? '✕ 收起' : '🤖 问鲁班' }}
-      </button>
-      <transition name="slide-up">
-        <AIChatBox v-if="showChat" />
-      </transition>
+        <!-- 通关成功弹窗 -->
+        <transition name="toast-pop">
+          <div v-if="showSuccess" class="success-overlay">
+            <div class="success-card">
+              <div class="success-icon">{{ currentLevel.successEmoji }}</div>
+              <h2 class="success-title">{{ currentLevel.successTitle }}</h2>
+              <p class="success-desc">{{ currentLevel.successDesc }}</p>
+              <div class="action-row">
+                <!-- 如果有下一关就显示"下一关"，否则显示"通关" -->
+                <button v-if="hasNextLevel" class="action-btn primary" @click="goNextLevel">
+                  下一关 →
+                </button>
+                <button v-else class="action-btn primary" @click="restartGame">
+                  🏆 再挑战
+                </button>
+                <button class="action-btn secondary" @click="replayLevel">
+                  ↺ 重玩本关
+                </button>
+              </div>
+            </div>
+          </div>
+        </transition>
+      </div>
+
+      <!-- 层级 3: AI 伴学聊天窗 -->
+      <div class="ai-box-wrapper">
+        <button class="ai-toggle-btn" @click="showChat = !showChat">
+          {{ showChat ? '✕ 收起' : '🤖 问鲁班' }}
+        </button>
+        <transition name="slide-up">
+          <AIChatBox v-if="showChat" />
+        </transition>
+      </div>
     </div>
 
     <!-- 层级 4: 图鉴页（从顶部滑入） -->
@@ -84,20 +88,36 @@
     <transition name="slide-assembly">
       <AssemblyView v-if="currentView === 'assembly'" @back="currentView = 'game'" />
     </transition>
+
+    <!-- 层级 6: 建筑修复（大匠造办） -->
+    <transition name="slide-guide">
+      <BuildingRepairView v-if="currentView === 'repair'" @back="currentView = 'game'" />
+    </transition>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import ThreeViewer   from './components/ThreeViewer.vue';
 import AIChatBox     from './components/AIChatBox.vue';
 import GuideView     from './components/GuideView.vue';
 import AssemblyView  from './components/AssemblyView.vue';
 import IntroSplash   from './components/IntroSplash.vue';
+import BuildingRepairView from './components/BuildingRepairView.vue';
 import { audioSystem } from './utils/audioSystem';
+import { store, addJoint, setPhase } from './store';
 
 // ── 页面控制 ──────────────────────────────────────────
-const currentView = ref('game'); // 'game' | 'guide' | 'assembly'
+const currentView = ref(store.currentPhase === 'building-repair' ? 'repair' : 'game');
+
+// 全局状态对齐：监听 currentView 并更新 store 的阶段
+watch(currentView, (newView) => {
+  if (newView === 'repair') {
+    setPhase('building-repair');
+  } else {
+    setPhase('3d-challenge');
+  }
+});
 const showIntro   = ref(true);
 
 // ── 关卡数据表 ────────────────────────────────────────────────
@@ -176,8 +196,14 @@ const toggleMusic = () => {
   audioSystem.playClick();
 };
 
-// 拼装成功回调
+// 拼装成功回调：将当前关卡对应的榫卯存入全局背包
 const onLevelPass = () => {
+  // 把本关榫卯类型（如 'straight', 'dovetail'）存入背包
+  const jointType = currentLevel.value.type;
+  const isNew = addJoint(jointType);
+  if (isNew) {
+    console.log(`🎒 新榫卯「${jointType}」已收入背包，当前背包:`, [...store.inventory]);
+  }
   showSuccess.value = true;
 };
 
@@ -212,6 +238,14 @@ const restartGame = () => {
   height: 100vh;
   overflow: hidden;
 }
+
+.game-phase-wrapper {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
 
 /* ── UI 覆盖层 ── */
 .ui-overlay {
