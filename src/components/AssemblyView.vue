@@ -428,37 +428,125 @@ const createPartMesh = (ptDef, slot = null, isGhost = false) => {
   const baseMaterial = new THREE.MeshStandardMaterial({
     color: ptDef.color,
     roughness: ptDef.roughness ?? 0.8,
+    metalness: 0.04,
     transparent: isGhost,
     opacity: isGhost ? 0.45 : 1,
     emissive: new THREE.Color(isGhost ? '#4488ff' : '#000000'),
     emissiveIntensity: isGhost ? 0.4 : 0,
   });
 
+  if (ptDef.id === 'foundation') {
+    const stoneGroup = new THREE.Group();
+    const stoneMat = new THREE.MeshStandardMaterial({
+      color: isGhost ? '#7e7e7e' : '#6d6b67',
+      roughness: 0.98,
+      metalness: 0.02,
+      transparent: isGhost,
+      opacity: isGhost ? 0.45 : 1,
+      emissive: new THREE.Color(isGhost ? '#4488ff' : '#000000'),
+      emissiveIntensity: isGhost ? 0.22 : 0,
+    });
+    const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.64, 0.18, 6), stoneMat);
+    const plinth = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.5, 0.14, 6), stoneMat);
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.38, 0.08, 6), stoneMat);
+    pedestal.position.y = -0.04;
+    plinth.position.y = 0.09;
+    cap.position.y = 0.2;
+    stoneGroup.add(pedestal, plinth, cap);
+    return stoneGroup;
+  }
+
+  if (ptDef.id === 'pillar') {
+    const pillarGroup = new THREE.Group();
+    const woodMat = new THREE.MeshStandardMaterial({
+      color: isGhost ? '#a46f3f' : '#8c5a2e',
+      roughness: 0.66,
+      metalness: 0.03,
+      transparent: isGhost,
+      opacity: isGhost ? 0.45 : 1,
+      emissive: new THREE.Color(isGhost ? '#4488ff' : '#000000'),
+      emissiveIntensity: isGhost ? 0.25 : 0,
+    });
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.23, 3.0, 18), woodMat);
+    const baseRing = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.3, 0.14, 18), woodMat);
+    const headRing = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.24, 0.16, 18), woodMat);
+    shaft.position.y = 0;
+    baseRing.position.y = -1.47;
+    headRing.position.y = 1.48;
+    pillarGroup.add(shaft, baseRing, headRing);
+    return pillarGroup;
+  }
+
+  if (ptDef.id === 'beam') {
+    const beamGroup = new THREE.Group();
+    const beamMat = new THREE.MeshStandardMaterial({
+      color: isGhost ? '#7a4926' : '#6b3d18',
+      roughness: 0.74,
+      metalness: 0.03,
+      transparent: isGhost,
+      opacity: isGhost ? 0.45 : 1,
+      emissive: new THREE.Color(isGhost ? '#4488ff' : '#000000'),
+      emissiveIntensity: isGhost ? 0.25 : 0,
+    });
+    const mainBeam = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.42, 0.5), beamMat);
+    const lowerBrace = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.12, 0.28), beamMat);
+    const endLeft = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.5, 0.56), beamMat);
+    const endRight = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.5, 0.56), beamMat);
+    lowerBrace.position.y = -0.22;
+    endLeft.position.x = -2.2;
+    endRight.position.x = 2.2;
+    beamGroup.add(mainBeam, lowerBrace, endLeft, endRight);
+    return beamGroup;
+  }
+
+  if (ptDef.id === 'ridgebeam') {
+    const ridgeGroup = new THREE.Group();
+    const ridgeMat = new THREE.MeshStandardMaterial({
+      color: isGhost ? '#5f6472' : '#565b69',
+      roughness: 0.78,
+      metalness: 0.06,
+      transparent: isGhost,
+      opacity: isGhost ? 0.45 : 1,
+      emissive: new THREE.Color(isGhost ? '#4488ff' : '#000000'),
+      emissiveIntensity: isGhost ? 0.2 : 0,
+    });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.24, 0.34), ridgeMat);
+    const crest = new THREE.Mesh(new THREE.BoxGeometry(5.12, 0.12, 0.18), ridgeMat);
+    body.position.y = 0;
+    crest.position.y = 0.17;
+    ridgeGroup.add(body, crest);
+    return ridgeGroup;
+  }
+
   if (ptDef.id === 'dougong') {
     const dougongGroup = new THREE.Group();
     const bracketMat = new THREE.MeshStandardMaterial({
       color: isGhost ? '#d7a45d' : '#c08840',
       roughness: 0.62,
+      metalness: 0.03,
       transparent: isGhost,
       opacity: isGhost ? 0.45 : 1,
       emissive: new THREE.Color(isGhost ? '#4488ff' : '#000000'),
       emissiveIntensity: isGhost ? 0.28 : 0,
     });
 
-    const baseBlock = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.24, 0.72), bracketMat);
-    const armLeft = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.18, 0.28), bracketMat);
-    const armRight = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.18, 0.28), bracketMat);
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.14, 0.8), bracketMat);
+    const baseBlock = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.18, 0.54), bracketMat);
+    const lowerArmLeft = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.12, 0.22), bracketMat);
+    const lowerArmRight = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.12, 0.22), bracketMat);
+    const upperArmLeft = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.1, 0.18), bracketMat);
+    const upperArmRight = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.1, 0.18), bracketMat);
+    const centerBlock = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.22, 0.34), bracketMat);
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.12, 0.68), bracketMat);
 
-    baseBlock.position.y = 0;
-    armLeft.position.set(-0.34, 0.12, 0);
-    armRight.position.set(0.34, 0.12, 0);
-    cap.position.y = 0.24;
+    baseBlock.position.y = -0.08;
+    lowerArmLeft.position.set(-0.27, 0.02, 0);
+    lowerArmRight.position.set(0.27, 0.02, 0);
+    upperArmLeft.position.set(-0.18, 0.15, 0);
+    upperArmRight.position.set(0.18, 0.15, 0);
+    centerBlock.position.y = 0.12;
+    cap.position.y = 0.28;
 
-    dougongGroup.add(baseBlock);
-    dougongGroup.add(armLeft);
-    dougongGroup.add(armRight);
-    dougongGroup.add(cap);
+    dougongGroup.add(baseBlock, lowerArmLeft, lowerArmRight, upperArmLeft, upperArmRight, centerBlock, cap);
     return dougongGroup;
   }
 
@@ -468,29 +556,52 @@ const createPartMesh = (ptDef, slot = null, isGhost = false) => {
 
   const roofGroup = new THREE.Group();
   const tileMat = new THREE.MeshStandardMaterial({
-    color: isGhost ? '#8a664c' : '#8f6548',
-    roughness: 0.96,
+    color: isGhost ? '#8a664c' : '#786454',
+    roughness: 0.94,
+    metalness: 0.02,
     transparent: isGhost,
     opacity: isGhost ? 0.35 : 1,
     emissive: new THREE.Color(isGhost ? '#305070' : '#000000'),
     emissiveIntensity: isGhost ? 0.15 : 0,
   });
+  const eaveMat = new THREE.MeshStandardMaterial({
+    color: isGhost ? '#65462f' : '#5d3c22',
+    roughness: 0.82,
+    metalness: 0.03,
+    transparent: isGhost,
+    opacity: isGhost ? 0.35 : 1,
+    emissive: new THREE.Color(isGhost ? '#305070' : '#000000'),
+    emissiveIntensity: isGhost ? 0.12 : 0,
+  });
 
   const roofPivot = new THREE.Group();
-  const panel = new THREE.Mesh(new THREE.BoxGeometry(ptDef.w, ptDef.h, ptDef.d), baseMaterial);
-  const cap = new THREE.Mesh(new THREE.BoxGeometry(ptDef.w * 0.96, ptDef.h * 0.38, ptDef.d * 0.94), tileMat);
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(ptDef.w, ptDef.h * 0.72, ptDef.d), eaveMat);
+  const tileLayer = new THREE.Mesh(new THREE.BoxGeometry(ptDef.w * 0.98, ptDef.h * 0.24, ptDef.d * 0.96), tileMat);
+  const ridgeLip = new THREE.Mesh(new THREE.BoxGeometry(ptDef.w * 0.22, ptDef.h * 0.2, ptDef.d * 0.92), tileMat);
+  const eave = new THREE.Mesh(new THREE.BoxGeometry(ptDef.w * 1.02, ptDef.h * 0.16, ptDef.d * 1.04), eaveMat);
 
   panel.position.y = 0;
-  cap.position.y = ptDef.h * 0.26;
+  tileLayer.position.y = ptDef.h * 0.18;
+  ridgeLip.position.x = slot?.id === 'roof-left' ? ptDef.w * 0.38 : slot?.id === 'roof-right' ? -ptDef.w * 0.38 : 0;
+  ridgeLip.position.y = ptDef.h * 0.22;
+  eave.position.y = -ptDef.h * 0.2;
 
-  roofPivot.add(panel);
-  roofPivot.add(cap);
+  roofPivot.add(panel, tileLayer, ridgeLip, eave);
+
+  const ribCount = 6;
+  for (let i = 0; i < ribCount; i++) {
+    const t = i / (ribCount - 1);
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(ptDef.w * 0.06, ptDef.h * 0.22, ptDef.d * 0.9), tileMat);
+    rib.position.x = -ptDef.w * 0.38 + t * ptDef.w * 0.76;
+    rib.position.y = ptDef.h * 0.23;
+    roofPivot.add(rib);
+  }
+
   roofGroup.add(roofPivot);
 
   const slopeDeg = slot?.id === 'roof-left' ? 32 : slot?.id === 'roof-right' ? -32 : 0;
-  const slideX = slot?.id === 'roof-left' ? -1.48 : slot?.id === 'roof-right' ? 1.48 : 0;
   const liftY = slot?.id?.startsWith('roof') ? 0.44 : 0;
-  roofPivot.position.set(slideX, liftY, 0);
+  roofPivot.position.set(0, liftY, 0);
   roofPivot.rotation.z = (slopeDeg * Math.PI) / 180;
 
   roofGroup.traverse((child) => {
@@ -504,7 +615,7 @@ const createPartMesh = (ptDef, slot = null, isGhost = false) => {
 const placePart = (ptDef, slot) => {
   const mesh = createPartMesh(ptDef, slot, false);
   mesh.position.set(slot.x, slot.y, slot.z);
-  mesh.rotation.y = ((slot.rot ?? 0) * Math.PI) / 180;
+  mesh.rotation.y = ptDef.id === 'roof' ? 0 : ((slot.rot ?? 0) * Math.PI) / 180;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.userData.partType = ptDef.id;
