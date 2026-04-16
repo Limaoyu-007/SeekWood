@@ -1,148 +1,122 @@
 <template>
   <div class="assembly-wrap">
-    <!-- ── 顶部导航 ── -->
     <header class="assembly-nav">
       <button class="back-btn" @click="$emit('back')">← 返回游戏</button>
       <div class="nav-center">
         <h1 class="nav-title">⚒ 古建自由拼装</h1>
-        <p class="nav-sub">选择构件，自由搭建属于你的古建房架</p>
+        <p class="nav-sub">自由选择已解锁构件，把整座房架慢慢拼起来</p>
       </div>
       <button class="finish-btn" @click="checkCompletion">完工验收 ✓</button>
     </header>
 
     <div class="assembly-body">
-      <!-- ── 左侧：构件库 ── -->
       <aside class="palette">
         <div class="palette-title">构件库</div>
 
+        <div class="step-banner">
+          <div class="step-label">自由搭建</div>
+          <div class="step-title">当前可拼</div>
+          <div class="step-desc">{{ availableTypeLabels }}</div>
+        </div>
+
         <div
-          v-for="pt in PART_TYPES" :key="pt.id"
-          :class="['part-btn', { active: selectedType === pt.id }]"
+          v-for="pt in PART_TYPES"
+          :key="pt.id"
+          :class="['part-btn', { active: selectedType === pt.id, disabled: !hasUnlockedSlots(pt.id), optional: pt.id === 'dougong' && isMainStructureComplete }]"
           @click="selectPart(pt.id)"
         >
           <div class="part-icon" :style="{ background: pt.color }"></div>
           <div class="part-text">
-            <span class="part-label">{{ pt.label }}</span>
-            <span class="part-count">已放 {{ getCount(pt.id) }}</span>
+            <span class="part-label">{{ pt.label }}<small v-if="pt.id === 'dougong'">(选修)</small></span>
+            <span class="part-count">已装 {{ getProgressText(pt.id) }}</span>
           </div>
         </div>
 
         <div class="palette-divider"></div>
 
         <div class="quick-tips">
-          <p>🖱️ <b>左键</b>点击放置构件</p>
-          <p>⌨️ <b>R 键</b>旋转构件方向</p>
-          <p>⌨️ <b>Delete</b>删除悬停构件</p>
-          <p>🔄 <b>右键拖拽</b>旋转视角</p>
-          <p>🏗️ <b>堆叠</b>点击已有构件上方</p>
+          <p>🖱️ <b>左键</b>点击高亮安装点放置构件</p>
+          <p>🎯 先在左侧选择构件，再去寻找对应安装点</p>
+          <p>🔄 <b>右键拖拽</b>旋转视角，滚轮缩放观察</p>
+          <p>✨ 未放置时会显示当前构件可用的安装位置</p>
         </div>
 
         <div class="palette-divider"></div>
         <button class="clear-btn" @click="clearAll">🗑 清空重建</button>
       </aside>
 
-      <!-- ── 中央：3D 画布 ── -->
       <div class="canvas-area" ref="containerRef">
+        <div class="build-hud">
+          <div class="build-step-chip">当前可拼：{{ availableTypeLabels }}</div>
+          <div class="placement-message" :class="{ ok: placementState === 'ok', warn: placementState === 'warn' }">
+            {{ placementHint }}
+          </div>
+        </div>
+
         <div v-if="selectedType" class="placing-indicator">
           <span class="placing-dot"></span>
           正在放置：{{ PART_TYPES.find(p => p.id === selectedType)?.label }}
-          <span class="orientation-tag">方向: {{ currentRotDeg }}°</span>
           <button class="cancel-place" @click="cancelPlacement">✕ 取消</button>
         </div>
-        <div v-else class="canvas-hint-top">从左侧选择构件开始放置</div>
+        <div v-else class="canvas-hint-top">从左侧自由选择已解锁构件，寻找高亮安装点</div>
       </div>
 
-      <!-- ── 右侧：参考图纸 ── -->
       <aside class="blueprint">
         <div class="blueprint-title">标准房架图纸</div>
-
-        <!-- 正面视图 SVG -->
         <div class="svg-wrap">
           <svg viewBox="0 0 180 200" class="bp-svg">
-            <!-- 地面线 -->
             <line x1="5" y1="190" x2="175" y2="190" stroke="#c89a5a" stroke-width="1.5" opacity="0.6"/>
-
-            <!-- 础石 (4块) -->
-            <rect x="18" y="178" width="22" height="12" fill="#5a5a5a" rx="1"/>
-            <rect x="57" y="178" width="22" height="12" fill="#5a5a5a" rx="1"/>
-            <rect x="100" y="178" width="22" height="12" fill="#5a5a5a" rx="1"/>
-            <rect x="139" y="178" width="22" height="12" fill="#5a5a5a" rx="1"/>
-
-            <!-- 立柱 (4根) -->
-            <rect x="25" y="118" width="9" height="60" fill="#8b5a2b" rx="2"/>
-            <rect x="64" y="118" width="9" height="60" fill="#8b5a2b" rx="2"/>
-            <rect x="107" y="118" width="9" height="60" fill="#8b5a2b" rx="2"/>
-            <rect x="146" y="118" width="9" height="60" fill="#8b5a2b" rx="2"/>
-
-            <!-- 额枋/横梁 (2根横跨) -->
-            <rect x="22" y="110" width="135" height="8" fill="#6b3d18" rx="2"/>
+            <rect x="18" y="178" width="22" height="12" fill="#5a5a5a" rx="1" :opacity="isPartHighlighted('foundation') ? 1 : 0.6"/>
+            <rect x="57" y="178" width="22" height="12" fill="#5a5a5a" rx="1" :opacity="isPartHighlighted('foundation') ? 1 : 0.6"/>
+            <rect x="100" y="178" width="22" height="12" fill="#5a5a5a" rx="1" :opacity="isPartHighlighted('foundation') ? 1 : 0.6"/>
+            <rect x="139" y="178" width="22" height="12" fill="#5a5a5a" rx="1" :opacity="isPartHighlighted('foundation') ? 1 : 0.6"/>
+            <rect x="25" y="118" width="9" height="60" fill="#8b5a2b" rx="2" :opacity="isPartHighlighted('pillar') ? 1 : 0.6"/>
+            <rect x="64" y="118" width="9" height="60" fill="#8b5a2b" rx="2" :opacity="isPartHighlighted('pillar') ? 1 : 0.6"/>
+            <rect x="107" y="118" width="9" height="60" fill="#8b5a2b" rx="2" :opacity="isPartHighlighted('pillar') ? 1 : 0.6"/>
+            <rect x="146" y="118" width="9" height="60" fill="#8b5a2b" rx="2" :opacity="isPartHighlighted('pillar') ? 1 : 0.6"/>
+            <rect x="22" y="110" width="135" height="8" fill="#6b3d18" rx="2" :opacity="isPartHighlighted('beam') ? 1 : 0.6"/>
             <rect x="22" y="100" width="135" height="5" fill="#5a3010" rx="1" opacity="0.7"/>
-
-            <!-- 斗拱 (4组) -->
-            <rect x="22" y="105" width="12" height="7" fill="#c08840" rx="1"/>
-            <rect x="61" y="105" width="12" height="7" fill="#c08840" rx="1"/>
-            <rect x="104" y="105" width="12" height="7" fill="#c08840" rx="1"/>
-            <rect x="143" y="105" width="12" height="7" fill="#c08840" rx="1"/>
-
-            <!-- 屋顶脊线 -->
-            <polygon points="90,55 20,100 160,100" fill="#4a4a5a" opacity="0.85"/>
-            <polygon points="90,55 30,98 150,98" fill="#3a3a4a"/>
-
-            <!-- 正脊 -->
-            <rect x="60" y="50" width="60" height="8" fill="#5a5a6a" rx="2"/>
-
-            <!-- 标注线 -->
-            <line x1="8" y1="178" x2="18" y2="178" stroke="#c89a5a" stroke-width="0.8" stroke-dasharray="2,2" opacity="0.5"/>
-            <line x1="8" y1="190" x2="8" y2="178" stroke="#c89a5a" stroke-width="0.8" opacity="0.5"/>
-            <text x="2" y="185" fill="#c89a5a" font-size="5" opacity="0.7">础</text>
-
-            <line x1="8" y1="118" x2="20" y2="118" stroke="#c89a5a" stroke-width="0.8" stroke-dasharray="2,2" opacity="0.5"/>
-            <line x1="8" y1="178" x2="8" y2="118" stroke="#c89a5a" stroke-width="0.8" opacity="0.5"/>
-            <text x="2" y="150" fill="#c89a5a" font-size="5" opacity="0.7">柱</text>
+            <rect x="22" y="105" width="12" height="7" fill="#c08840" rx="1" :opacity="isPartHighlighted('dougong') ? 1 : 0.4"/>
+            <rect x="61" y="105" width="12" height="7" fill="#c08840" rx="1" :opacity="isPartHighlighted('dougong') ? 1 : 0.4"/>
+            <rect x="104" y="105" width="12" height="7" fill="#c08840" rx="1" :opacity="isPartHighlighted('dougong') ? 1 : 0.4"/>
+            <rect x="143" y="105" width="12" height="7" fill="#c08840" rx="1" :opacity="isPartHighlighted('dougong') ? 1 : 0.4"/>
+            <polygon points="90,55 20,100 160,100" fill="#4a4a5a" :opacity="isPartHighlighted('roof') ? 1 : 0.85"/>
+            <polygon points="90,55 30,98 150,98" fill="#3a3a4a" :opacity="isPartHighlighted('roof') ? 1 : 0.75"/>
+            <rect x="60" y="50" width="60" height="8" fill="#5a5a6a" rx="2" :opacity="isPartHighlighted('ridgebeam') ? 1 : 0.6"/>
+            <line x1="90" y1="55" x2="90" y2="100" stroke="#f0d080" stroke-width="1" opacity="0.18"/>
           </svg>
         </div>
 
-        <!-- 进度清单 -->
-        <div class="checklist-title">完工清单</div>
+        <div class="checklist-title">结构进度</div>
         <div class="checklist">
-          <div
-            v-for="item in CHECKLIST" :key="item.key"
-            :class="['check-item', { done: getCount(item.key) >= item.min }]"
-          >
-            <span class="check-icon">{{ getCount(item.key) >= item.min ? '✓' : '○' }}</span>
+          <div v-for="item in CHECKLIST" :key="item.key" :class="['check-item', { done: isChecklistDone(item.key), current: hasUnlockedSlots(item.key) && !isChecklistDone(item.key) }]">
+            <span class="check-icon">{{ isChecklistDone(item.key) ? '✓' : hasUnlockedSlots(item.key) ? '➜' : '○' }}</span>
             <span class="check-label">{{ item.label }}</span>
-            <span class="check-progress">{{ Math.min(getCount(item.key), item.min) }}/{{ item.min }}</span>
+            <span class="check-progress">{{ getProgressText(item.key) }}</span>
           </div>
         </div>
       </aside>
     </div>
 
-    <!-- ── 完工验收弹窗 ── -->
     <transition name="pop">
       <div v-if="showResult" class="result-overlay" @click.self="showResult = false">
         <div class="result-card">
           <div class="result-score-ring">
             <svg viewBox="0 0 60 60" class="ring-svg">
               <circle cx="30" cy="30" r="24" fill="none" stroke="rgba(200,154,90,0.2)" stroke-width="5"/>
-              <circle cx="30" cy="30" r="24" fill="none"
-                :stroke="resultScore >= 4 ? '#f0d080' : '#c89a5a'"
-                stroke-width="5" stroke-linecap="round"
-                :stroke-dasharray="`${resultScore * 37.7} 150.8`"
-                transform="rotate(-90 30 30)"
-                style="transition: stroke-dasharray 0.8s ease"/>
+              <circle cx="30" cy="30" r="24" fill="none" :stroke="resultScore >= 4 ? '#f0d080' : '#c89a5a'" stroke-width="5" stroke-linecap="round" :stroke-dasharray="`${Math.min(resultScore, 5) * 30.16} 150.8`" transform="rotate(-90 30 30)" style="transition: stroke-dasharray 0.8s ease"/>
             </svg>
-            <div class="ring-text">{{ resultScore }}/4</div>
+            <div class="ring-text">{{ resultScore }}/5</div>
           </div>
 
-          <div class="result-emoji">{{ resultScore >= 4 ? '🏆' : resultScore >= 2 ? '🔨' : '📐' }}</div>
+          <div class="result-emoji">{{ resultScore >= 5 ? '🏯' : resultScore >= 4 ? '🏆' : resultScore >= 2 ? '🔨' : '📐' }}</div>
           <h2 class="result-title">{{ resultTitle }}</h2>
           <p class="result-desc">{{ resultDesc }}</p>
 
           <div class="result-checks">
-            <div v-for="item in CHECKLIST" :key="item.key"
-                 :class="['rc-item', { pass: getCount(item.key) >= item.min }]">
-              <span>{{ getCount(item.key) >= item.min ? '✓' : '✗' }}</span>
-              {{ item.label }}
+            <div v-for="item in CHECKLIST" :key="item.key" :class="['rc-item', { pass: isChecklistDone(item.key) }]">
+              <span>{{ isChecklistDone(item.key) ? '✓' : '✗' }}</span>
+              {{ item.label }}（{{ getProgressText(item.key) }}）
             </div>
           </div>
 
@@ -157,79 +131,575 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { audioSystem } from '../utils/audioSystem';
 
 defineEmits(['back']);
 
-// ── 构件定义 ────────────────────────────────────────────────────
 const PART_TYPES = [
-  { id: 'foundation', label: '础石',  color: '#5a5a5a', w: 1.0,  h: 0.28, d: 1.0,  roughness: 0.95 },
-  { id: 'pillar',     label: '立柱',  color: '#8b5a2b', w: 0.45, h: 3.2,  d: 0.45, roughness: 0.72 },
-  { id: 'beam',       label: '横梁',  color: '#6b3d18', w: 4.5,  h: 0.48, d: 0.55, roughness: 0.78 },
-  { id: 'dougong',    label: '斗拱',  color: '#c08840', w: 0.85, h: 0.48, d: 0.85, roughness: 0.65 },
-  { id: 'ridgebeam',  label: '正脊',  color: '#4a4a5a', w: 5.2,  h: 0.38, d: 0.48, roughness: 0.80 },
+  { id: 'foundation', label: '础石', color: '#5a5a5a', w: 1.0, h: 0.28, d: 1.0, roughness: 0.95 },
+  { id: 'pillar', label: '立柱', color: '#8b5a2b', w: 0.45, h: 3.2, d: 0.45, roughness: 0.72 },
+  { id: 'beam', label: '横梁', color: '#6b3d18', w: 4.5, h: 0.48, d: 0.55, roughness: 0.78 },
+  { id: 'dougong', label: '斗拱', color: '#c08840', w: 0.85, h: 0.48, d: 0.85, roughness: 0.65 },
+  { id: 'ridgebeam', label: '正脊', color: '#4a4a5a', w: 5.2, h: 0.38, d: 0.48, roughness: 0.8 },
+  { id: 'roof', label: '屋面', color: '#6f4b36', w: 5.8, h: 0.32, d: 2.8, roughness: 0.88 },
 ];
+
+const BUILD_SLOTS = {
+  foundation: [
+    { id: 'f1', x: -3, y: 0.14, z: -2 },
+    { id: 'f2', x: 3, y: 0.14, z: -2 },
+    { id: 'f3', x: -3, y: 0.14, z: 2 },
+    { id: 'f4', x: 3, y: 0.14, z: 2 },
+  ],
+  pillar: [
+    { id: 'p1', x: -3, y: 1.88, z: -2, requires: 'f1' },
+    { id: 'p2', x: 3, y: 1.88, z: -2, requires: 'f2' },
+    { id: 'p3', x: -3, y: 1.88, z: 2, requires: 'f3' },
+    { id: 'p4', x: 3, y: 1.88, z: 2, requires: 'f4' },
+  ],
+  beam: [
+    { id: 'b1', x: 0, y: 3.68, z: -2, rot: 0, requires: ['p1', 'p2'] },
+    { id: 'b2', x: 0, y: 3.68, z: 2, rot: 0, requires: ['p3', 'p4'] },
+  ],
+  ridgebeam: [
+    { id: 'r1', x: 0, y: 5.1, z: 0, rot: 90, requires: ['b1', 'b2'] },
+  ],
+  roof: [
+    { id: 'roof-left', x: -1.12, y: 4.94, z: 0, rot: 90, requires: ['r1'] },
+    { id: 'roof-right', x: 1.12, y: 4.94, z: 0, rot: 90, requires: ['r1'] },
+  ],
+  dougong: [
+    { id: 'd1', x: -2.42, y: 3.42, z: -2, requires: 'p1' },
+    { id: 'd2', x: 2.42, y: 3.42, z: -2, requires: 'p2' },
+    { id: 'd3', x: -2.42, y: 3.42, z: 2, requires: 'p3' },
+    { id: 'd4', x: 2.42, y: 3.42, z: 2, requires: 'p4' },
+  ],
+};
 
 const CHECKLIST = [
-  { key: 'foundation', label: '柱础就位 ×4', min: 4 },
-  { key: 'pillar',     label: '立柱竖立 ×4', min: 4 },
-  { key: 'beam',       label: '横梁横跨 ×2', min: 2 },
-  { key: 'ridgebeam',  label: '正脊就位 ×1', min: 1 },
+  { key: 'foundation', label: '柱础定位' },
+  { key: 'pillar', label: '立柱竖立' },
+  { key: 'beam', label: '横梁架设' },
+  { key: 'ridgebeam', label: '正脊封顶' },
+  { key: 'roof', label: '屋面铺设' },
+  { key: 'dougong', label: '斗拱装饰' },
 ];
 
-// ── 响应式状态 ──────────────────────────────────────────────────
-const containerRef  = ref(null);
-const selectedType  = ref(null);
-const placedParts   = ref([]);   // { type, mesh }
-const showResult    = ref(false);
-const resultScore   = ref(0);
-const resultTitle   = ref('');
-const resultDesc    = ref('');
+const containerRef = ref(null);
+const selectedType = ref('foundation');
+const placedParts = ref([]);
+const showResult = ref(false);
+const resultScore = ref(0);
+const resultTitle = ref('');
+const resultDesc = ref('');
+const hoveredSlot = ref(null);
+const placementHint = ref('先从柱础开始，也可以在已解锁的构件之间自由切换。');
+const placementState = ref('warn');
 
-const getCount = (typeId) => placedParts.value.filter(p => p.type === typeId).length;
+const availableTypeIds = computed(() => PART_TYPES.filter((pt) => getAvailableSlots(pt.id).length > 0).map((pt) => pt.id));
+const availableTypeLabels = computed(() => availableTypeIds.value.length
+  ? PART_TYPES.filter((pt) => availableTypeIds.value.includes(pt.id)).map((pt) => pt.label).join('、')
+  : '所有安装点都已完成'
+);
+const isMainStructureComplete = computed(() => ['foundation', 'pillar', 'beam', 'ridgebeam', 'roof'].every((key) => isChecklistDone(key)));
+const isPartHighlighted = (typeId) => selectedType.value === typeId || (hasUnlockedSlots(typeId) && !selectedType.value);
 
-// ── 新增：旋转与动态高度状态 ────────────────────────────────────
-const currentRotDeg = ref(0);
-const targetSnapY   = ref(0); // 实时计算的吸附高度
-
-// ── Three.js 变量 ───────────────────────────────────────────────
 let renderer, scene, camera, controls, animId;
 let isSceneActive = true;
 let lastFrameTime = 0;
 let lastRenderTime = 0;
 const FRAME_INTERVAL = 1000 / 30;
 const RENDER_INTERVAL = 1000 / 24;
-let ghostMesh     = null;   // 放置预览虚影
-let floorPlane    = null;   // 射线检测地面
-let hoveredMesh   = null;   // 当前悬停中的已放置构件
-const placedMeshes = [];    // 保存所有已放置 mesh（与 placedParts 同步）
+let ghostMesh = null;
+let floorPlane = null;
+let hoveredMesh = null;
+const placedMeshes = [];
+const helperRings = [];
+const raycaster = new THREE.Raycaster();
+const mousePt = new THREE.Vector2();
 
-// ── 网格吸附（X/Z 方向 0.5 单位） ────────────────────────────
-const GRID = 0.5;
-const snapXZ = (v) => Math.round(v / GRID) * GRID;
-
-// ── 键盘处理：R 旋转 / Delete 删除 ─────────────────────────────
-const onKeyDown = (e) => {
-  const key = e.key.toLowerCase();
-  if (key === 'r') {
-    currentRotDeg.value = (currentRotDeg.value + 90) % 360;
-    audioSystem.playClick();
-    if (ghostMesh) {
-      ghostMesh.rotation.y = (currentRotDeg.value * Math.PI) / 180;
-    }
-  }
-  if (key === 'delete' || key === 'backspace') {
-    deleteHovered();
-  }
+const getPartDef = (typeId) => PART_TYPES.find((p) => p.id === typeId);
+const getSlots = (typeId) => BUILD_SLOTS[typeId] || [];
+const isSlotOccupied = (slotId) => placedParts.value.some((part) => part.slotId === slotId);
+const isSlotUnlocked = (slot) => {
+  if (!slot.requires) return true;
+  if (Array.isArray(slot.requires)) return slot.requires.every((req) => isSlotOccupied(req));
+  return isSlotOccupied(slot.requires);
+};
+const getAvailableSlots = (typeId) => getSlots(typeId).filter((slot) => !isSlotOccupied(slot.id) && isSlotUnlocked(slot));
+const hasUnlockedSlots = (typeId) => getAvailableSlots(typeId).length > 0;
+const getProgress = (typeId) => ({ done: placedParts.value.filter((p) => p.type === typeId).length, total: getSlots(typeId).length });
+const getProgressText = (typeId) => {
+  const { done, total } = getProgress(typeId);
+  return `${done}/${total}`;
+};
+const isChecklistDone = (typeId) => {
+  const { done, total } = getProgress(typeId);
+  return total > 0 && done >= total;
+};
+const updatePlacementHint = (message, state = 'warn') => {
+  placementHint.value = message;
+  placementState.value = state;
 };
 
-// ── 初始化 ─────────────────────────────────────────────────────
+const forEachMesh = (obj, callback) => {
+  obj?.traverse?.((child) => {
+    if (child.isMesh) callback(child);
+  });
+};
+
+const disposeObject3D = (obj) => {
+  forEachMesh(obj, (mesh) => {
+    mesh.geometry?.dispose?.();
+    if (Array.isArray(mesh.material)) mesh.material.forEach((mat) => mat.dispose?.());
+    else mesh.material?.dispose?.();
+  });
+};
+
+const setObjectMaterialState = (obj, { opacity, emissive, emissiveIntensity }) => {
+  forEachMesh(obj, (mesh) => {
+    if (opacity != null) mesh.material.opacity = opacity;
+    if (emissive != null) mesh.material.emissive?.set(emissive);
+    if (emissiveIntensity != null) mesh.material.emissiveIntensity = emissiveIntensity;
+  });
+};
+
+const getPlacedRoot = (object) => {
+  let current = object;
+  while (current) {
+    if (placedMeshes.includes(current)) return current;
+    current = current.parent;
+  }
+  return null;
+};
+
+const getNearestSlot = (typeId, x, z) => {
+  const slots = getAvailableSlots(typeId);
+  if (!slots.length) return null;
+  let best = null;
+  let bestDist = Infinity;
+  for (const slot of slots) {
+    const dx = slot.x - x;
+    const dz = slot.z - z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < bestDist) {
+      best = slot;
+      bestDist = dist;
+    }
+  }
+  return bestDist <= 1.8 ? best : null;
+};
+
+const updateHelperRings = () => {
+  helperRings.forEach((ring) => {
+    const available = !isSlotOccupied(ring.userData.slotId) && isSlotUnlocked(ring.userData.slot);
+    const selectedMatches = !selectedType.value || ring.userData.partType === selectedType.value;
+    ring.visible = available && selectedMatches;
+    ring.material.opacity = ring.userData.slotId === hoveredSlot.value?.id ? 0.95 : 0.4;
+    ring.material.color.set(ring.userData.slotId === hoveredSlot.value?.id ? '#f4dd9a' : '#8e6734');
+  });
+};
+
+const rebuildGhost = () => {
+  if (ghostMesh) {
+    scene.remove(ghostMesh);
+    disposeObject3D(ghostMesh);
+    ghostMesh = null;
+  }
+  hoveredSlot.value = null;
+  if (!selectedType.value) {
+    updateHelperRings();
+    return;
+  }
+
+  const pt = getPartDef(selectedType.value);
+  ghostMesh = createPartMesh(pt, null, true);
+  scene.add(ghostMesh);
+  updateHelperRings();
+};
+
+const selectPart = (typeId) => {
+  if (!hasUnlockedSlots(typeId)) {
+    updatePlacementHint(`当前没有可放置的${getPartDef(typeId).label}安装点。`, 'warn');
+    audioSystem.playClick();
+    return;
+  }
+
+  selectedType.value = selectedType.value === typeId ? null : typeId;
+  if (selectedType.value) updatePlacementHint(`正在寻找${getPartDef(selectedType.value).label}的安装点。`, 'warn');
+  else updatePlacementHint('已取消当前构件，重新自由选择即可。', 'warn');
+  audioSystem.playClick();
+  rebuildGhost();
+};
+
+const cancelPlacement = () => {
+  selectedType.value = null;
+  updatePlacementHint('已取消当前构件，重新自由选择即可。', 'warn');
+  rebuildGhost();
+};
+
+const updateMousePt = (e) => {
+  const rect = renderer.domElement.getBoundingClientRect();
+  mousePt.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  mousePt.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+};
+
+const createPartMesh = (ptDef, slot = null, isGhost = false) => {
+  const baseMaterial = new THREE.MeshStandardMaterial({
+    color: ptDef.color,
+    roughness: ptDef.roughness ?? 0.8,
+    transparent: isGhost,
+    opacity: isGhost ? 0.45 : 1,
+    emissive: new THREE.Color(isGhost ? '#4488ff' : '#000000'),
+    emissiveIntensity: isGhost ? 0.4 : 0,
+  });
+
+  if (ptDef.id === 'dougong') {
+    const dougongGroup = new THREE.Group();
+    const bracketMat = new THREE.MeshStandardMaterial({
+      color: isGhost ? '#d7a45d' : '#c08840',
+      roughness: 0.62,
+      transparent: isGhost,
+      opacity: isGhost ? 0.45 : 1,
+      emissive: new THREE.Color(isGhost ? '#4488ff' : '#000000'),
+      emissiveIntensity: isGhost ? 0.28 : 0,
+    });
+
+    const baseBlock = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.24, 0.72), bracketMat);
+    const armLeft = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.18, 0.28), bracketMat);
+    const armRight = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.18, 0.28), bracketMat);
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.14, 0.8), bracketMat);
+
+    baseBlock.position.y = 0;
+    armLeft.position.set(-0.34, 0.12, 0);
+    armRight.position.set(0.34, 0.12, 0);
+    cap.position.y = 0.24;
+
+    dougongGroup.add(baseBlock);
+    dougongGroup.add(armLeft);
+    dougongGroup.add(armRight);
+    dougongGroup.add(cap);
+    return dougongGroup;
+  }
+
+  if (ptDef.id !== 'roof') {
+    return new THREE.Mesh(new THREE.BoxGeometry(ptDef.w, ptDef.h, ptDef.d), baseMaterial);
+  }
+
+  const roofGroup = new THREE.Group();
+  const tileMat = new THREE.MeshStandardMaterial({
+    color: isGhost ? '#8a664c' : '#8f6548',
+    roughness: 0.96,
+    transparent: isGhost,
+    opacity: isGhost ? 0.35 : 1,
+    emissive: new THREE.Color(isGhost ? '#305070' : '#000000'),
+    emissiveIntensity: isGhost ? 0.15 : 0,
+  });
+
+  const roofPivot = new THREE.Group();
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(ptDef.w, ptDef.h, ptDef.d), baseMaterial);
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(ptDef.w * 0.96, ptDef.h * 0.38, ptDef.d * 0.94), tileMat);
+
+  panel.position.y = 0;
+  cap.position.y = ptDef.h * 0.26;
+
+  roofPivot.add(panel);
+  roofPivot.add(cap);
+  roofGroup.add(roofPivot);
+
+  const slopeDeg = slot?.id === 'roof-left' ? 32 : slot?.id === 'roof-right' ? -32 : 0;
+  const slideX = slot?.id === 'roof-left' ? -1.48 : slot?.id === 'roof-right' ? 1.48 : 0;
+  const liftY = slot?.id?.startsWith('roof') ? 0.44 : 0;
+  roofPivot.position.set(slideX, liftY, 0);
+  roofPivot.rotation.z = (slopeDeg * Math.PI) / 180;
+
+  roofGroup.traverse((child) => {
+    if (child.isMesh) child.userData.isRoofPiece = true;
+  });
+
+  roofGroup.userData.baseY = slot?.y ?? ptDef.h / 2 + liftY;
+  return roofGroup;
+};
+
+const placePart = (ptDef, slot) => {
+  const mesh = createPartMesh(ptDef, slot, false);
+  mesh.position.set(slot.x, slot.y, slot.z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.partType = ptDef.id;
+  mesh.userData.slotId = slot.id;
+
+  mesh.traverse((child) => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+
+  const dropH = ptDef.id === 'roof' ? 0.7 : 1.0;
+  mesh.position.y = slot.y + dropH;
+  scene.add(mesh);
+  placedMeshes.push(mesh);
+  placedParts.value.push({ type: ptDef.id, mesh, slotId: slot.id, valid: true });
+  audioSystem.playSnap();
+
+  const startY = mesh.position.y;
+  const startT = performance.now();
+  const drop = () => {
+    const t = Math.min((performance.now() - startT) / 280, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    mesh.position.y = startY + (slot.y - startY) * ease;
+    if (t < 1) requestAnimationFrame(drop);
+  };
+  drop();
+
+  mesh.traverse((child) => {
+    if (child.isMesh) {
+      child.material.emissive?.set('#ffcc44');
+      child.material.emissiveIntensity = 0.5;
+      setTimeout(() => { child.material.emissiveIntensity = child.material.transparent ? child.material.emissiveIntensity : 0; }, 400);
+    }
+  });
+
+  if (!hasUnlockedSlots(selectedType.value)) selectedType.value = availableTypeIds.value[0] ?? null;
+  updatePlacementHint(`已安装${ptDef.label}，你可以继续自由补齐其他已解锁构件。`, 'ok');
+  rebuildGhost();
+};
+
+const deleteHovered = () => {
+  if (!hoveredMesh) return;
+  scene.remove(hoveredMesh);
+  disposeObject3D(hoveredMesh);
+  const meshIdx = placedMeshes.indexOf(hoveredMesh);
+  if (meshIdx !== -1) placedMeshes.splice(meshIdx, 1);
+  const partIdx = placedParts.value.findIndex((p) => p.mesh === hoveredMesh);
+  if (partIdx !== -1) placedParts.value.splice(partIdx, 1);
+  hoveredMesh = null;
+  audioSystem.playClick();
+  updatePlacementHint('已移除构件，可以重新选择任意已解锁安装点继续搭建。', 'warn');
+  if (selectedType.value && !hasUnlockedSlots(selectedType.value)) selectedType.value = availableTypeIds.value[0] ?? null;
+  rebuildGhost();
+};
+
+const clearAll = () => {
+  [...placedMeshes].forEach((m) => {
+    scene.remove(m);
+    disposeObject3D(m);
+  });
+  placedMeshes.length = 0;
+  placedParts.value = [];
+  hoveredMesh = null;
+  hoveredSlot.value = null;
+  selectedType.value = 'foundation';
+  updatePlacementHint('先从柱础开始，也可以在已解锁的构件之间自由切换。', 'warn');
+  rebuildGhost();
+};
+
+const getCompletionStatus = () => {
+  const foundationDone = isChecklistDone('foundation');
+  const pillarDone = isChecklistDone('pillar');
+  const beamDone = isChecklistDone('beam');
+  const ridgeDone = isChecklistDone('ridgebeam');
+  const roofDone = isChecklistDone('roof');
+  const dougongDone = isChecklistDone('dougong');
+  const score = [foundationDone, pillarDone, beamDone, ridgeDone, roofDone, dougongDone].filter(Boolean).length;
+  return { foundationDone, pillarDone, beamDone, ridgeDone, roofDone, dougongDone, score };
+};
+
+const checkCompletion = () => {
+  const status = getCompletionStatus();
+  resultScore.value = status.score;
+  if (status.score === 6) {
+    resultTitle.value = '形制齐整，房架大成！';
+    resultDesc.value = '主体梁架、屋面与斗拱全部归位，这座古建房架已经真正完整落成。';
+  } else if (status.roofDone) {
+    resultTitle.value = '房架完整，还可锦上添花';
+    resultDesc.value = '屋面已经盖好，主体房架完整成立，可继续补齐斗拱，让檐下层次更丰富。';
+  } else if (status.ridgeDone) {
+    resultTitle.value = '只差盖上屋面';
+    resultDesc.value = '正脊已经就位，再把左右两片屋面铺上，这座房架才算完整。';
+  } else if (!status.foundationDone) {
+    resultTitle.value = '先稳根基';
+    resultDesc.value = '四角承重点尚未立稳，请先安放四个柱础。';
+  } else if (!status.pillarDone) {
+    resultTitle.value = '骨架未立';
+    resultDesc.value = '柱础已定，但立柱尚未齐备，请先把四柱竖起。';
+  } else if (!status.beamDone) {
+    resultTitle.value = '尚未成架';
+    resultDesc.value = '房柱已立，还需前后两道横梁把框架连起来。';
+  } else {
+    resultTitle.value = '只差封顶';
+    resultDesc.value = '横梁已成，请将正脊安放到中轴线上完成封顶。';
+  }
+  showResult.value = true;
+};
+
+const onKeyDown = (e) => {
+  const key = e.key.toLowerCase();
+  if (key === 'delete' || key === 'backspace') deleteHovered();
+};
+
+const onMouseMove = (e) => {
+  updateMousePt(e);
+  raycaster.setFromCamera(mousePt, camera);
+
+  const pmHits = raycaster.intersectObjects(placedMeshes, true);
+  const nowHovered = pmHits.length > 0 ? getPlacedRoot(pmHits[0].object) : null;
+  if (nowHovered !== hoveredMesh) {
+    if (hoveredMesh) setObjectMaterialState(hoveredMesh, { emissiveIntensity: 0 });
+    hoveredMesh = nowHovered;
+    if (hoveredMesh) {
+      hoveredMesh.traverse?.((child) => {
+        if (child.isMesh) child.material.emissiveIntensity = child.userData.isRoofPiece ? 0.08 : 0.3;
+      });
+      renderer.domElement.style.cursor = 'pointer';
+    } else {
+      renderer.domElement.style.cursor = selectedType.value ? 'crosshair' : 'default';
+    }
+  }
+
+  if (!selectedType.value || !ghostMesh) {
+    hoveredSlot.value = null;
+    updateHelperRings();
+    return;
+  }
+
+  const groundHits = raycaster.intersectObject(floorPlane);
+  if (!groundHits.length) return;
+
+  const pt = groundHits[0].point;
+  const nearestSlot = getNearestSlot(selectedType.value, pt.x, pt.z);
+  hoveredSlot.value = nearestSlot;
+
+  if (!nearestSlot) {
+    const selectedPart = getPartDef(selectedType.value);
+    const freeY = selectedPart.id === 'roof' ? 4.9 : selectedPart.id === 'dougong' ? 3.42 : selectedPart.h / 2;
+    setObjectMaterialState(ghostMesh, { opacity: 0.2, emissive: '#aa3333' });
+    ghostMesh.position.set(pt.x, freeY, pt.z);
+    ghostMesh.userData._baseY = freeY;
+    updatePlacementHint('请靠近高亮安装点放置构件。', 'warn');
+    updateHelperRings();
+    return;
+  }
+
+  ghostMesh.position.set(nearestSlot.x, nearestSlot.y, nearestSlot.z);
+  ghostMesh.userData._baseY = nearestSlot.y;
+
+  setObjectMaterialState(ghostMesh, { opacity: 0.5, emissive: '#66aaff' });
+  updatePlacementHint(`此处可安装${getPartDef(selectedType.value).label}。`, 'ok');
+  updateHelperRings();
+};
+
+const onCanvasClick = () => {
+  if (!selectedType.value) return;
+  if (!hoveredSlot.value) {
+    updatePlacementHint('此处没有可用安装点，请靠近高亮位置。', 'warn');
+    audioSystem.playClick();
+    return;
+  }
+
+  placePart(getPartDef(selectedType.value), hoveredSlot.value);
+};
+
+const onContextMenu = (e) => e.preventDefault();
+
+const buildSceneLights = () => {
+  scene.add(new THREE.AmbientLight('#ffd890', 0.6));
+  const sun = new THREE.DirectionalLight('#fff8e0', 2.0);
+  sun.position.set(8, 14, 8);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.left = sun.shadow.camera.bottom = -14;
+  sun.shadow.camera.right = sun.shadow.camera.top = 14;
+  sun.shadow.camera.far = 50;
+  scene.add(sun);
+
+  const fill = new THREE.DirectionalLight('#c06030', 0.4);
+  fill.position.set(-6, 4, -4);
+  scene.add(fill);
+};
+
+const buildFloor = () => {
+  const floorMat = new THREE.MeshStandardMaterial({ color: '#1d1508', roughness: 0.98 });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 24), floorMat);
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  const borderMat = new THREE.LineBasicMaterial({ color: '#3a2a10', opacity: 0.5, transparent: true });
+  const borderGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(12, 0.02, 12));
+  const border = new THREE.LineSegments(borderGeo, borderMat);
+  border.position.y = 0.01;
+  scene.add(border);
+
+  const grid = new THREE.GridHelper(12, 24, '#2a1e0a', '#1e1508');
+  grid.position.y = 0.01;
+  scene.add(grid);
+
+  const axisLineMat = new THREE.LineBasicMaterial({ color: '#4a3520', opacity: 0.4, transparent: true });
+  const makeAxis = (pts) => new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts.map(([x, z]) => new THREE.Vector3(x, 0.02, z))),
+    axisLineMat
+  );
+  scene.add(makeAxis([[-6, 0], [6, 0]]));
+  scene.add(makeAxis([[0, -6], [0, 6]]));
+};
+
+const buildHelperRings = () => {
+  Object.entries(BUILD_SLOTS).forEach(([typeId, slots]) => {
+    slots.forEach((slot) => {
+      const ring = new THREE.Mesh(
+        new THREE.RingGeometry(0.35, 0.48, 32),
+        new THREE.MeshBasicMaterial({ color: '#8e6734', transparent: true, opacity: 0.4, side: THREE.DoubleSide })
+      );
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.set(slot.x, slot.y + 0.02, slot.z);
+      ring.userData = { slotId: slot.id, partType: typeId, slot };
+      scene.add(ring);
+      helperRings.push(ring);
+    });
+  });
+  updateHelperRings();
+};
+
+const onResize = () => {
+  const el = containerRef.value;
+  if (!el) return;
+  const W = el.clientWidth;
+  const H = el.clientHeight;
+  camera.aspect = W / H;
+  camera.updateProjectionMatrix();
+  renderer.setSize(W, H);
+};
+
+const onVisibilityChange = () => {
+  isSceneActive = document.visibilityState === 'visible';
+};
+
+const animate = (now = 0) => {
+  animId = requestAnimationFrame(animate);
+  if (!isSceneActive) return;
+  if (now - lastFrameTime < FRAME_INTERVAL) return;
+  lastFrameTime = now;
+  controls.update();
+
+  if (ghostMesh) {
+    ghostMesh.userData._baseY = ghostMesh.userData._baseY ?? ghostMesh.position.y;
+    ghostMesh.position.y = ghostMesh.userData._baseY + Math.sin(now * 0.003) * 0.06;
+  }
+
+  if (now - lastRenderTime < RENDER_INTERVAL) return;
+  lastRenderTime = now;
+  renderer.render(scene, camera);
+};
+
 onMounted(() => {
   const el = containerRef.value;
-  const W = el.clientWidth, H = el.clientHeight;
+  const W = el.clientWidth;
+  const H = el.clientHeight;
 
   scene = new THREE.Scene();
   scene.background = new THREE.Color('#181208');
@@ -261,8 +731,8 @@ onMounted(() => {
 
   buildSceneLights();
   buildFloor();
+  buildHelperRings();
 
-  // 射线检测用的隐形地面平面
   const floorGeo = new THREE.PlaneGeometry(40, 40);
   const floorMat = new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide });
   floorPlane = new THREE.Mesh(floorGeo, floorMat);
@@ -270,8 +740,10 @@ onMounted(() => {
   floorPlane.position.y = 0;
   scene.add(floorPlane);
 
+  rebuildGhost();
+
   const canvas = renderer.domElement;
-  canvas.addEventListener('click',     onCanvasClick);
+  canvas.addEventListener('click', onCanvasClick);
   canvas.addEventListener('contextmenu', onContextMenu);
   canvas.addEventListener('mousemove', onMouseMove);
   window.addEventListener('keydown', onKeyDown);
@@ -290,303 +762,16 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKeyDown);
   window.removeEventListener('resize', onResize);
   document.removeEventListener('visibilitychange', onVisibilityChange);
+  if (ghostMesh) disposeObject3D(ghostMesh);
+  helperRings.forEach((ring) => disposeObject3D(ring));
+  placedMeshes.forEach((mesh) => disposeObject3D(mesh));
+  disposeObject3D(floorPlane);
   controls?.dispose();
   renderer?.dispose();
 });
-
-// ── 场景灯光 ────────────────────────────────────────────────────
-const buildSceneLights = () => {
-  scene.add(new THREE.AmbientLight('#ffd890', 0.6));
-
-  const sun = new THREE.DirectionalLight('#fff8e0', 2.0);
-  sun.position.set(8, 14, 8);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = sun.shadow.camera.bottom = -14;
-  sun.shadow.camera.right = sun.shadow.camera.top = 14;
-  sun.shadow.camera.far = 50;
-  scene.add(sun);
-
-  const fill = new THREE.DirectionalLight('#c06030', 0.4);
-  fill.position.set(-6, 4, -4);
-  scene.add(fill);
-};
-
-// ── 地面与网格 ──────────────────────────────────────────────────
-const buildFloor = () => {
-  // 地面板
-  const floorMat = new THREE.MeshStandardMaterial({ color: '#1d1508', roughness: 0.98 });
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(24, 24), floorMat);
-  floor.rotation.x = -Math.PI / 2;
-  floor.receiveShadow = true;
-  scene.add(floor);
-
-  // 外边框
-  const borderMat = new THREE.LineBasicMaterial({ color: '#3a2a10', opacity: 0.5, transparent: true });
-  const borderGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(12, 0.02, 12));
-  const border = new THREE.LineSegments(borderGeo, borderMat);
-  border.position.y = 0.01;
-  scene.add(border);
-
-  // 网格线（GridHelper）
-  const grid = new THREE.GridHelper(12, 24, '#2a1e0a', '#1e1508');
-  grid.position.y = 0.01;
-  scene.add(grid);
-
-  // 中心标记十字
-  const axisLineMat = new THREE.LineBasicMaterial({ color: '#4a3520', opacity: 0.4, transparent: true });
-  const makeAxis = (pts) => new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(pts.map(([x, z]) => new THREE.Vector3(x, 0.02, z))),
-    axisLineMat
-  );
-  scene.add(makeAxis([[-6, 0], [6, 0]]));
-  scene.add(makeAxis([[0, -6], [0, 6]]));
-};
-
-
-// ── 鼠标工具 ─────────────────────────────────────────────────
-const raycaster  = new THREE.Raycaster();
-const mousePt    = new THREE.Vector2();
-
-const updateMousePt = (e) => {
-  const rect = renderer.domElement.getBoundingClientRect();
-  mousePt.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
-  mousePt.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
-};
-
-// ── 鼠标移动：更新虚影位置 + 悬停高亮 + 动态堆叠检测 ──────────
-const onMouseMove = (e) => {
-  updateMousePt(e);
-  raycaster.setFromCamera(mousePt, camera);
-
-  // 1. 获取悬停对象（Delete 键删除用）
-  const pmHits = raycaster.intersectObjects(placedMeshes, false);
-  const nowHovered = pmHits.length > 0 ? pmHits[0].object : null;
-  if (nowHovered !== hoveredMesh) {
-    if (hoveredMesh) hoveredMesh.material.emissiveIntensity = 0;
-    hoveredMesh = nowHovered;
-    if (hoveredMesh) {
-      hoveredMesh.material.emissive = new THREE.Color('#ff3300');
-      hoveredMesh.material.emissiveIntensity = 0.3;
-      renderer.domElement.style.cursor = 'pointer';
-    } else {
-      renderer.domElement.style.cursor = selectedType.value ? 'crosshair' : 'default';
-    }
-  }
-
-  // 2. 更新虚影位置与计算堆叠高度
-  if (selectedType.value && ghostMesh) {
-    const pt_def = PART_TYPES.find(p => p.id === selectedType.value);
-    
-    // 优先检测是否鼠标放在已有的构件上（堆叠逻辑）
-    const stackHits = raycaster.intersectObjects(placedMeshes, false);
-    if (stackHits.length > 0) {
-      const hit = stackHits[0];
-      const box = new THREE.Box3().setFromObject(hit.object);
-      // 新构件底部贴在旧构件顶部，XZ 用鼠标命中点（网格吸附），允许偏移放置
-      targetSnapY.value = box.max.y + pt_def.h / 2;
-      ghostMesh.position.set(snapXZ(hit.point.x), targetSnapY.value, snapXZ(hit.point.z));
-      ghostMesh.userData._baseY = targetSnapY.value;
-    } else {
-      // 否则检测地面
-      const groundHits = raycaster.intersectObject(floorPlane);
-      if (groundHits.length > 0) {
-        const pt = groundHits[0].point;
-        targetSnapY.value = pt_def.h / 2;
-        ghostMesh.position.set(snapXZ(pt.x), targetSnapY.value, snapXZ(pt.z));
-        ghostMesh.userData._baseY = targetSnapY.value;
-      }
-    }
-  }
-};
-
-// ── 左键点击：根据计算出的 targetSnapY 放置构件 ──────────────────
-const onCanvasClick = (e) => {
-  if (!selectedType.value) return;
-  updateMousePt(e);
-  raycaster.setFromCamera(mousePt, camera);
-  
-  const stackHits = raycaster.intersectObjects(placedMeshes, false);
-  let finalX, finalY, finalZ;
-  const pt_def = PART_TYPES.find(p => p.id === selectedType.value);
-
-  if (stackHits.length > 0) {
-    const hit = stackHits[0];
-    const box = new THREE.Box3().setFromObject(hit.object);
-    finalX = snapXZ(hit.point.x);
-    finalY = box.max.y + pt_def.h / 2;
-    finalZ = snapXZ(hit.point.z);
-  } else {
-    const groundHits = raycaster.intersectObject(floorPlane);
-    if (groundHits.length === 0) return;
-    const pt = groundHits[0].point;
-    finalX = snapXZ(pt.x);
-    finalY = pt_def.h / 2;
-    finalZ = snapXZ(pt.z);
-  }
-
-  placePart(pt_def, finalX, finalY, finalZ);
-};
-
-// ── 右键菜单：仅阻止默认菜单，不再执行删除 ─────────────────────
-const onContextMenu = (e) => {
-  e.preventDefault();
-};
-
-// ── 删除悬停中的构件（Delete / Backspace 触发） ─────────────────
-const deleteHovered = () => {
-  if (!hoveredMesh) return;
-  scene.remove(hoveredMesh);
-  hoveredMesh.geometry.dispose();
-  hoveredMesh.material.dispose();
-  const idx = placedMeshes.indexOf(hoveredMesh);
-  if (idx !== -1) {
-    placedMeshes.splice(idx, 1);
-    placedParts.value.splice(idx, 1);
-    audioSystem.playClick();
-  }
-  hoveredMesh = null;
-};
-
-// ── 取消放置（清除虚影 + 重置选中状态）─────────────────────────
-const cancelPlacement = () => {
-  selectedType.value = null;
-  rebuildGhost();
-};
-
-// ── 放置构件 ────────────────────────────────────────────────────
-const placePart = (pt_def, x, y, z) => {
-  const mat = new THREE.MeshStandardMaterial({
-    color: pt_def.color, roughness: pt_def.roughness ?? 0.8,
-    emissive: new THREE.Color('#000000'), emissiveIntensity: 0,
-  });
-  const geo  = new THREE.BoxGeometry(pt_def.w, pt_def.h, pt_def.d);
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(x, y, z);
-  mesh.rotation.y = (currentRotDeg.value * Math.PI) / 180;
-  mesh.castShadow = mesh.receiveShadow = true;
-  mesh.userData.partType = pt_def.id;
-
-  // 落下动画
-  const dropH = 1.0;
-  mesh.position.y = y + dropH;
-  scene.add(mesh);
-  placedMeshes.push(mesh);
-  placedParts.value.push({ type: pt_def.id, mesh });
-  
-  audioSystem.playSnap();
-
-  const startY = mesh.position.y;
-  const startT = performance.now();
-  const drop = () => {
-    const t = Math.min((performance.now() - startT) / 280, 1);
-    const ease = 1 - Math.pow(1 - t, 3);
-    mesh.position.y = startY + (y - startY) * ease;
-    if (t < 1) requestAnimationFrame(drop);
-  };
-  drop();
-
-  mat.emissive.set('#ffcc44');
-  mat.emissiveIntensity = 0.5;
-  setTimeout(() => { mat.emissiveIntensity = 0; }, 400);
-};
-
-
-// ── 虚影：选中构件类型时创建 / 切换时重建 ──────────────────────
-const selectPart = (typeId) => {
-  selectedType.value = selectedType.value === typeId ? null : typeId;
-  audioSystem.playClick();
-  rebuildGhost();
-};
-
-const rebuildGhost = () => {
-  if (ghostMesh) {
-    scene.remove(ghostMesh);
-    ghostMesh.geometry.dispose();
-    ghostMesh.material.dispose();
-    ghostMesh = null;
-  }
-  if (!selectedType.value) return;
-  const pt_def = PART_TYPES.find(p => p.id === selectedType.value);
-  ghostMesh = new THREE.Mesh(
-    new THREE.BoxGeometry(pt_def.w, pt_def.h, pt_def.d),
-    new THREE.MeshStandardMaterial({
-      color: pt_def.color, transparent: true, opacity: 0.45,
-      emissive: new THREE.Color('#4488ff'), emissiveIntensity: 0.4,
-    })
-  );
-  ghostMesh.rotation.y = (currentRotDeg.value * Math.PI) / 180;
-  scene.add(ghostMesh);
-};
-
-// ── 清空 ────────────────────────────────────────────────────────
-const clearAll = () => {
-  [...placedMeshes].forEach(m => {
-    scene.remove(m);
-    m.geometry.dispose();
-    m.material.dispose();
-  });
-  placedMeshes.length = 0;
-  placedParts.value = [];
-  hoveredMesh = null;
-};
-
-// ── 完工验收 ────────────────────────────────────────────────────
-const checkCompletion = () => {
-  const score = CHECKLIST.filter(c => getCount(c.key) >= c.min).length;
-  resultScore.value = score;
-
-  if (score === 4) {
-    resultTitle.value = '房架建成！恭喜！';
-    resultDesc.value = '四大构件全部就位，一座完整的抬梁式木构房架已然成形。\n古匠人的智慧就在你手中传承。';
-  } else if (score >= 2) {
-    resultTitle.value = '初具雏形，继续加油！';
-    resultDesc.value = '房架框架已现，但仍有构件缺失，\n请参照右侧图纸补齐剩余构件。';
-  } else {
-    resultTitle.value = '万事起于基础';
-    resultDesc.value = '先从础石和立柱开始，一步一步搭建。\n对照右侧"完工清单"完成每一步。';
-  }
-  showResult.value = true;
-};
-
-
-// ── 窗口自适应 ──────────────────────────────────────────────────
-const onResize = () => {
-  const el = containerRef.value;
-  if (!el) return;
-  const W = el.clientWidth, H = el.clientHeight;
-  camera.aspect = W / H;
-  camera.updateProjectionMatrix();
-  renderer.setSize(W, H);
-};
-
-const onVisibilityChange = () => {
-  isSceneActive = document.visibilityState === 'visible';
-};
-
-// ── 动画循环 ────────────────────────────────────────────────────
-const animate = (now = 0) => {
-  animId = requestAnimationFrame(animate);
-  if (!isSceneActive) return;
-  if (now - lastFrameTime < FRAME_INTERVAL) return;
-  lastFrameTime = now;
-
-  controls.update();
-
-  // 虚影悬浮动效（使用赋值而非累加，避免漂移）
-  if (ghostMesh) {
-    ghostMesh.userData._baseY = ghostMesh.userData._baseY ?? ghostMesh.position.y;
-    ghostMesh.position.y = ghostMesh.userData._baseY + Math.sin(now * 0.003) * 0.06;
-  }
-
-  if (now - lastRenderTime < RENDER_INTERVAL) return;
-  lastRenderTime = now;
-  renderer.render(scene, camera);
-};
 </script>
 
 <style scoped>
-/* ── 整体布局 ── */
 .assembly-wrap {
   position: absolute;
   inset: 0;
@@ -598,305 +783,83 @@ const animate = (now = 0) => {
   overflow: hidden;
 }
 
-/* ── 顶部导航 ── */
 .assembly-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 28px;
   height: 60px;
-  border-bottom: 1px solid rgba(200,154,90,0.2);
-  background: rgba(10,7,3,0.7);
+  border-bottom: 1px solid rgba(200, 154, 90, 0.2);
+  background: rgba(10, 7, 3, 0.7);
   backdrop-filter: blur(10px);
   flex-shrink: 0;
   gap: 16px;
 }
-.back-btn {
-  padding: 7px 18px;
-  background: rgba(139,90,43,0.3);
-  border: 1px solid rgba(200,154,90,0.4);
-  border-radius: 20px;
-  color: #d4a96a;
-  font-family: "楷体", serif;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-.back-btn:hover { background: rgba(139,90,43,0.6); color: #f0d080; }
+
+.back-btn { padding: 7px 18px; background: rgba(139, 90, 43, 0.3); border: 1px solid rgba(200, 154, 90, 0.4); border-radius: 20px; color: #d4a96a; font-family: "楷体", serif; font-size: 14px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.back-btn:hover { background: rgba(139, 90, 43, 0.6); color: #f0d080; }
 .nav-center { text-align: center; flex: 1; }
-.nav-title {
-  font-family: "楷体", serif;
-  font-size: 20px;
-  color: #f0d080;
-  letter-spacing: 3px;
-  margin: 0;
-}
-.nav-sub {
-  font-size: 11px;
-  color: rgba(200,160,80,0.5);
-  letter-spacing: 2px;
-  margin: 2px 0 0;
-}
-.finish-btn {
-  padding: 9px 22px;
-  background: linear-gradient(135deg, #c89a5a, #8b5a2b);
-  border: none;
-  border-radius: 20px;
-  color: #fff;
-  font-family: "楷体", serif;
-  font-size: 15px;
-  cursor: pointer;
-  white-space: nowrap;
-  box-shadow: 0 3px 12px rgba(0,0,0,0.3);
-  transition: all 0.2s;
-}
-.finish-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.4); }
-
-/* ── 主体三列 ── */
-.assembly-body {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-
-/* ── 左侧构件库 ── */
-.palette {
-  width: 148px;
-  flex-shrink: 0;
-  background: rgba(10,7,3,0.75);
-  border-right: 1px solid rgba(200,154,90,0.15);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 10px;
-  overflow-y: auto;
-}
-.palette::-webkit-scrollbar { width: 3px; }
-.palette::-webkit-scrollbar-thumb { background: rgba(200,154,90,0.2); border-radius: 2px; }
-.palette-title {
-  font-family: "楷体", serif;
-  font-size: 14px;
-  color: #c89a5a;
-  letter-spacing: 3px;
-  text-align: center;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(200,154,90,0.2);
-}
-.part-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 8px;
-  border-radius: 8px;
-  border: 1px solid rgba(200,154,90,0.15);
-  background: rgba(255,255,255,0.03);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.part-btn:hover { border-color: rgba(200,154,90,0.4); background: rgba(255,255,255,0.07); }
-.part-btn.active {
-  border-color: #c89a5a;
-  background: rgba(200,154,90,0.12);
-  box-shadow: 0 0 10px rgba(200,154,90,0.15);
-}
-.part-icon {
-  width: 22px; height: 22px;
-  border-radius: 4px;
-  flex-shrink: 0;
-  border: 1px solid rgba(255,255,255,0.1);
-}
-.part-text { display: flex; flex-direction: column; gap: 2px; }
-.part-label { font-family: "楷体", serif; font-size: 13px; color: #d4a96a; }
-.part-count { font-size: 10px; color: rgba(200,154,90,0.5); }
-.palette-divider {
-  height: 1px;
-  background: rgba(200,154,90,0.12);
-  margin: 4px 0;
-}
-.quick-tips {
-  display: flex; flex-direction: column; gap: 4px;
-  font-size: 10px; line-height: 1.7;
-  color: rgba(200,154,90,0.45);
-  padding: 4px 2px;
-}
-.quick-tips b { color: rgba(200,154,90,0.7); }
-.clear-btn {
-  margin-top: auto;
-  padding: 8px 0;
-  background: rgba(200,50,30,0.12);
-  border: 1px solid rgba(200,50,30,0.25);
-  border-radius: 8px;
-  color: rgba(200,100,80,0.7);
-  font-family: "楷体", serif;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.clear-btn:hover { background: rgba(200,50,30,0.25); color: #ff8060; }
-
-/* ── 中央画布 ── */
-.canvas-area {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-}
-.placing-indicator {
-  position: absolute;
-  top: 14px; left: 50%; transform: translateX(-50%);
-  background: rgba(10,7,3,0.8);
-  border: 1px solid rgba(200,154,90,0.5);
-  border-radius: 24px;
-  padding: 7px 18px;
-  color: #c89a5a;
-  font-size: 13px;
-  letter-spacing: 1px;
-  display: flex; align-items: center; gap: 10px;
-  backdrop-filter: blur(8px);
-  z-index: 5;
-}
-.placing-dot {
-  width: 8px; height: 8px;
-  border-radius: 50%;
-  background: #c89a5a;
-  animation: blink 0.9s ease-in-out infinite alternate;
-}
-@keyframes blink { from { opacity: 0.3; } to { opacity: 1; } }
-.orientation-tag {
-  background: rgba(200, 154, 90, 0.2);
-  border: 1px solid rgba(200, 154, 90, 0.3);
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  color: #f0d080;
-}
-.cancel-place {
-  background: none; border: 1px solid rgba(200,154,90,0.3);
-  border-radius: 12px; padding: 2px 10px;
-  color: rgba(200,154,90,0.7); font-size: 12px; cursor: pointer;
-}
-.canvas-hint-top {
-  position: absolute;
-  top: 14px; left: 50%; transform: translateX(-50%);
-  background: rgba(10,7,3,0.65);
-  border: 1px solid rgba(200,154,90,0.2);
-  border-radius: 20px; padding: 6px 18px;
-  color: rgba(200,154,90,0.5); font-size: 12px; letter-spacing: 1px;
-  pointer-events: none; z-index: 5;
-}
-
-/* ── 右侧图纸 ── */
-.blueprint {
-  width: 168px;
-  flex-shrink: 0;
-  background: rgba(8,5,2,0.8);
-  border-left: 1px solid rgba(200,154,90,0.15);
-  display: flex;
-  flex-direction: column;
-  padding: 12px 10px;
-  gap: 8px;
-  overflow-y: auto;
-}
-.blueprint::-webkit-scrollbar { width: 3px; }
-.blueprint::-webkit-scrollbar-thumb { background: rgba(200,154,90,0.2); border-radius: 2px; }
-.blueprint-title {
-  font-family: "楷体", serif;
-  font-size: 13px; color: #c89a5a;
-  letter-spacing: 2px; text-align: center;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(200,154,90,0.15);
-}
-.svg-wrap {
-  background: rgba(0,20,40,0.3);
-  border: 1px solid rgba(100,150,200,0.2);
-  border-radius: 8px;
-  padding: 6px;
-}
-.bp-svg { width: 100%; height: auto; }
-.checklist-title {
-  font-family: "楷体", serif;
-  font-size: 12px; color: rgba(200,154,90,0.6);
-  letter-spacing: 2px; text-align: center;
-}
-.checklist { display: flex; flex-direction: column; gap: 6px; }
-.check-item {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11px; color: rgba(200,154,90,0.45);
-  padding: 5px 6px;
-  border: 1px solid rgba(200,154,90,0.1);
-  border-radius: 6px;
-  transition: all 0.3s;
-}
-.check-item.done {
-  color: #c89a5a;
-  border-color: rgba(200,154,90,0.4);
-  background: rgba(200,154,90,0.07);
-}
-.check-icon {
-  font-size: 12px; min-width: 14px; text-align: center;
-  color: inherit; font-weight: bold;
-}
+.nav-title { font-family: "楷体", serif; font-size: 20px; color: #f0d080; letter-spacing: 3px; margin: 0; }
+.nav-sub { font-size: 11px; color: rgba(200, 160, 80, 0.5); letter-spacing: 2px; margin: 2px 0 0; }
+.finish-btn { padding: 9px 22px; background: linear-gradient(135deg, #c89a5a, #8b5a2b); border: none; border-radius: 20px; color: #fff; font-family: "楷体", serif; font-size: 15px; cursor: pointer; white-space: nowrap; box-shadow: 0 3px 12px rgba(0, 0, 0, 0.3); transition: all 0.2s; }
+.finish-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4); }
+.assembly-body { flex: 1; display: flex; overflow: hidden; }
+.palette, .blueprint { width: 280px; padding: 18px; background: rgba(15, 10, 5, 0.92); border-right: 1px solid rgba(200, 154, 90, 0.12); overflow-y: auto; }
+.blueprint { border-right: none; border-left: 1px solid rgba(200, 154, 90, 0.12); }
+.palette-title, .blueprint-title, .checklist-title { font-family: "楷体", serif; font-size: 18px; color: #f0d080; margin-bottom: 14px; letter-spacing: 2px; }
+.step-banner { padding: 12px 14px; border: 1px solid rgba(240, 208, 128, 0.22); border-radius: 14px; background: linear-gradient(180deg, rgba(54, 34, 11, 0.9), rgba(25, 16, 8, 0.95)); margin-bottom: 16px; }
+.step-label { font-size: 11px; color: rgba(240, 208, 128, 0.55); letter-spacing: 2px; }
+.step-title { font-size: 18px; color: #f7de9a; font-family: "楷体", serif; margin-top: 4px; }
+.step-desc { margin-top: 6px; color: rgba(234, 206, 144, 0.74); font-size: 12px; line-height: 1.6; }
+.part-btn { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; background: rgba(255, 255, 255, 0.03); border: 1px solid transparent; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; }
+.part-btn:hover { border-color: rgba(200, 154, 90, 0.36); transform: translateY(-1px); }
+.part-btn.active { border-color: #f0d080; background: rgba(200, 154, 90, 0.12); box-shadow: 0 0 0 1px rgba(240, 208, 128, 0.14) inset; }
+.part-btn.disabled { opacity: 0.36; cursor: not-allowed; filter: grayscale(0.2); }
+.part-btn.disabled:hover { transform: none; border-color: transparent; }
+.part-btn.optional { border-style: dashed; }
+.part-icon { width: 18px; height: 18px; border-radius: 5px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.25); flex-shrink: 0; }
+.part-text { display: flex; flex-direction: column; min-width: 0; }
+.part-label { color: #f1ddb1; font-size: 14px; }
+.part-label small { font-size: 11px; color: rgba(240, 208, 128, 0.58); }
+.part-count { color: rgba(204, 173, 114, 0.62); font-size: 12px; margin-top: 3px; }
+.palette-divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(200, 154, 90, 0.25), transparent); margin: 18px 0; }
+.quick-tips p { margin: 8px 0; font-size: 13px; color: rgba(222, 197, 142, 0.76); line-height: 1.5; }
+.clear-btn { width: 100%; padding: 12px 16px; border: 1px solid rgba(200, 154, 90, 0.35); border-radius: 14px; background: rgba(104, 50, 20, 0.22); color: #efc887; cursor: pointer; transition: all 0.2s; }
+.clear-btn:hover { background: rgba(139, 90, 43, 0.45); }
+.canvas-area { position: relative; flex: 1; min-width: 0; }
+.build-hud { position: absolute; top: 20px; left: 20px; z-index: 6; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+.build-step-chip, .placement-message, .placing-indicator, .canvas-hint-top { background: rgba(10, 7, 3, 0.72); border: 1px solid rgba(200, 154, 90, 0.22); backdrop-filter: blur(10px); }
+.build-step-chip { color: #f0d080; border-radius: 999px; padding: 9px 16px; font-size: 13px; letter-spacing: 1px; }
+.placement-message { border-radius: 14px; padding: 10px 14px; color: rgba(239, 213, 164, 0.82); font-size: 13px; max-width: 320px; line-height: 1.5; }
+.placement-message.ok { border-color: rgba(139, 210, 154, 0.4); color: #d9f7d8; }
+.placement-message.warn { border-color: rgba(200, 154, 90, 0.3); }
+.placing-indicator, .canvas-hint-top { position: absolute; top: 20px; right: 20px; z-index: 6; border-radius: 999px; padding: 10px 16px; color: #f5ddaa; display: flex; align-items: center; gap: 10px; }
+.placing-dot { width: 10px; height: 10px; background: #f0d080; border-radius: 50%; box-shadow: 0 0 8px rgba(240, 208, 128, 0.8); }
+.cancel-place { border: none; background: rgba(255, 255, 255, 0.08); color: #f5ddaa; border-radius: 999px; padding: 5px 10px; cursor: pointer; }
+.svg-wrap { padding: 14px; border-radius: 14px; background: radial-gradient(circle at top, rgba(73, 48, 18, 0.45), rgba(13, 10, 6, 0.96)); border: 1px solid rgba(200, 154, 90, 0.14); }
+.bp-svg { width: 100%; display: block; }
+.checklist { display: flex; flex-direction: column; gap: 10px; }
+.check-item { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.03); color: rgba(233, 212, 166, 0.72); border: 1px solid transparent; }
+.check-item.current { border-color: rgba(240, 208, 128, 0.22); }
+.check-item.done { background: rgba(116, 90, 34, 0.3); color: #f4dd9a; }
+.check-icon { width: 20px; text-align: center; }
 .check-label { flex: 1; }
-.check-progress {
-  font-size: 10px;
-  color: rgba(200,154,90,0.4);
-  white-space: nowrap;
-}
-.check-item.done .check-progress { color: #c89a5a; }
-
-/* ── 完工弹窗 ── */
-.result-overlay {
-  position: absolute; inset: 0; z-index: 50;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(0,0,0,0.65);
-  backdrop-filter: blur(6px);
-}
-.result-card {
-  background: linear-gradient(145deg, #2a1a08, #180e04);
-  border: 2px solid #c89a5a;
-  border-radius: 20px;
-  padding: 40px 50px;
-  text-align: center;
-  display: flex; flex-direction: column; align-items: center; gap: 14px;
-  min-width: 340px;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,220,120,0.12);
-}
-.result-score-ring { position: relative; width: 80px; height: 80px; }
-.ring-svg { width: 80px; height: 80px; }
-.ring-text {
-  position: absolute; inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-family: "楷体", serif; font-size: 19px; color: #f0d080;
-}
-.result-emoji { font-size: 52px; }
-.result-title { font-family: "楷体", serif; font-size: 28px; color: #f0d080; margin: 0; }
-.result-desc { font-size: 13px; color: rgba(200,170,100,0.75); line-height: 2; white-space: pre-line; margin: 0; }
-.result-checks {
-  display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
-}
-.rc-item {
-  padding: 4px 14px;
-  border-radius: 12px;
-  font-size: 12px;
-  border: 1px solid rgba(200,50,50,0.3);
-  color: rgba(200,80,80,0.7);
-  background: rgba(200,50,50,0.06);
-}
-.rc-item.pass {
-  border-color: rgba(200,154,90,0.4);
-  color: #c89a5a;
-  background: rgba(200,154,90,0.08);
-}
-.result-actions { display: flex; gap: 12px; margin-top: 4px; }
-.ra-btn {
-  padding: 11px 28px; border: none; border-radius: 10px;
-  font-family: "楷体", serif; font-size: 16px; cursor: pointer; transition: all 0.2s;
-}
-.ra-btn.primary { background: linear-gradient(135deg, #c89a5a, #a0724a); color: #fff; }
-.ra-btn.secondary { background: rgba(255,255,255,0.07); border: 1px solid rgba(200,154,90,0.35); color: #d4a96a; }
-.ra-btn:hover { transform: translateY(-2px); }
-
-/* ── 弹窗过渡 ── */
-.pop-enter-active, .pop-leave-active { transition: all 0.3s ease; }
-.pop-enter-from, .pop-leave-to { opacity: 0; transform: scale(0.88); }
+.check-progress { color: rgba(240, 208, 128, 0.72); font-size: 12px; }
+.result-overlay { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.5); display: flex; align-items: center; justify-content: center; z-index: 40; }
+.result-card { width: 420px; max-width: calc(100vw - 40px); padding: 28px; border-radius: 24px; background: linear-gradient(180deg, rgba(43, 26, 11, 0.98), rgba(15, 9, 4, 0.98)); border: 1px solid rgba(240, 208, 128, 0.18); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45); text-align: center; }
+.result-score-ring { width: 120px; height: 120px; margin: 0 auto 12px; position: relative; }
+.ring-svg { width: 100%; height: 100%; }
+.ring-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #f3d895; font-size: 24px; font-family: "楷体", serif; }
+.result-emoji { font-size: 34px; margin-bottom: 8px; }
+.result-title { font-family: "楷体", serif; color: #f4dd9a; margin: 0; }
+.result-desc { color: rgba(235, 212, 164, 0.8); line-height: 1.75; white-space: pre-line; }
+.result-checks { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; text-align: left; }
+.rc-item { padding: 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.03); color: rgba(235, 212, 164, 0.72); }
+.rc-item.pass { background: rgba(120, 92, 30, 0.25); color: #f4dd9a; }
+.result-actions { display: flex; gap: 12px; justify-content: center; }
+.ra-btn { padding: 10px 18px; border-radius: 999px; border: none; cursor: pointer; }
+.ra-btn.primary { background: linear-gradient(135deg, #d0a564, #8d5a2f); color: #fff; }
+.ra-btn.secondary { background: rgba(255, 255, 255, 0.08); color: #f5ddaa; }
+.pop-enter-active, .pop-leave-active { transition: opacity 0.25s ease, transform 0.25s ease; }
+.pop-enter-from, .pop-leave-to { opacity: 0; transform: scale(0.96); }
 </style>
