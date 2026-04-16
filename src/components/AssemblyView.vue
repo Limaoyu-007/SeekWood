@@ -6,7 +6,7 @@
         <h1 class="nav-title">⚒ 古建自由拼装</h1>
         <p class="nav-sub">自由选择已解锁构件，把整座房架慢慢拼起来</p>
       </div>
-      <button class="finish-btn" @click="checkCompletion">完工验收 ✓</button>
+      <button class="finish-btn" @click="checkCompletion">{{ buildMode === 'guide' ? '完工验收 ✓' : '查看创作 ✓' }}</button>
     </header>
 
     <div class="assembly-body">
@@ -14,15 +14,23 @@
         <div class="palette-title">构件库</div>
 
         <div class="step-banner">
-          <div class="step-label">自由搭建</div>
-          <div class="step-title">当前可拼</div>
+          <div class="step-label">{{ buildMode === 'guide' ? '教学搭建' : '自由创作' }}</div>
+          <div class="step-title">{{ buildMode === 'guide' ? '当前可拼' : '创作模式' }}</div>
           <div class="step-desc">{{ availableTypeLabels }}</div>
         </div>
+
+        <button
+          v-if="canEnterFreeMode"
+          class="mode-toggle-btn"
+          @click="toggleBuildMode"
+        >
+          {{ buildMode === 'guide' ? '进入自由创作' : '返回教学搭建' }}
+        </button>
 
         <div
           v-for="pt in PART_TYPES"
           :key="pt.id"
-          :class="['part-btn', { active: selectedType === pt.id, disabled: !hasUnlockedSlots(pt.id), optional: pt.id === 'dougong' && isMainStructureComplete }]"
+          :class="['part-btn', { active: selectedType === pt.id, disabled: !canSelectPart(pt.id), optional: pt.id === 'dougong' && isMainStructureComplete }]"
           @click="selectPart(pt.id)"
         >
           <div class="part-icon" :style="{ background: pt.color }"></div>
@@ -35,10 +43,10 @@
         <div class="palette-divider"></div>
 
         <div class="quick-tips">
-          <p>🖱️ <b>左键</b>点击高亮安装点放置构件</p>
-          <p>🎯 先在左侧选择构件，再去寻找对应安装点</p>
+          <p>🖱️ <b>左键</b>点击{{ buildMode === 'guide' ? '高亮安装点' : '地面任意位置' }}放置构件</p>
+          <p>🎯 {{ buildMode === 'guide' ? '先在左侧选择构件，再去寻找对应安装点' : '自由模式下可任选构件，在地面自由组合房架' }}</p>
           <p>🔄 <b>右键拖拽</b>旋转视角，滚轮缩放观察</p>
-          <p>✨ 未放置时会显示当前构件可用的安装位置</p>
+          <p>⌨️ <b>Q / E</b>{{ buildMode === 'guide' ? '预览自由旋转视角' : '旋转当前待放构件方向' }}</p>
         </div>
 
         <div class="palette-divider"></div>
@@ -56,13 +64,14 @@
         <div v-if="selectedType" class="placing-indicator">
           <span class="placing-dot"></span>
           正在放置：{{ PART_TYPES.find(p => p.id === selectedType)?.label }}
+          <span v-if="buildMode === 'free'" class="rotation-chip">角度 {{ Math.round((freeRotation * 180) / Math.PI) }}°</span>
           <button class="cancel-place" @click="cancelPlacement">✕ 取消</button>
         </div>
-        <div v-else class="canvas-hint-top">从左侧自由选择已解锁构件，寻找高亮安装点</div>
+        <div v-else class="canvas-hint-top">{{ buildMode === 'guide' ? '从左侧自由选择已解锁构件，寻找高亮安装点' : '自由创作已开启：选择构件后可在地面任意落位' }}</div>
       </div>
 
       <aside class="blueprint">
-        <div class="blueprint-title">标准房架图纸</div>
+        <div class="blueprint-title">{{ buildMode === 'guide' ? '标准房架图纸' : '自由创作参考' }}</div>
         <div class="svg-wrap">
           <svg viewBox="0 0 180 200" class="bp-svg">
             <line x1="5" y1="190" x2="175" y2="190" stroke="#c89a5a" stroke-width="1.5" opacity="0.6"/>
@@ -87,13 +96,19 @@
           </svg>
         </div>
 
-        <div class="checklist-title">结构进度</div>
-        <div class="checklist">
+        <div class="checklist-title">{{ buildMode === 'guide' ? '结构进度' : '创作提示' }}</div>
+        <div v-if="buildMode === 'guide'" class="checklist">
           <div v-for="item in CHECKLIST" :key="item.key" :class="['check-item', { done: isChecklistDone(item.key), current: hasUnlockedSlots(item.key) && !isChecklistDone(item.key) }]">
             <span class="check-icon">{{ isChecklistDone(item.key) ? '✓' : hasUnlockedSlots(item.key) ? '➜' : '○' }}</span>
             <span class="check-label">{{ item.label }}</span>
             <span class="check-progress">{{ getProgressText(item.key) }}</span>
           </div>
+        </div>
+        <div v-else class="free-notes">
+          <p>• 主体房架已经完成，现在可以自由重组构件。</p>
+          <p>• 使用 <b>Q / E</b> 调整朝向，尝试不同屋面与梁柱组合。</p>
+          <p>• 删除键可拆除当前选中的构件，方便反复试验。</p>
+          <p>• 图纸仅作参考，你的作品不必完全照着标准样式。</p>
         </div>
       </aside>
     </div>
@@ -121,7 +136,8 @@
           </div>
 
           <div class="result-actions">
-            <button class="ra-btn primary" @click="showResult = false">继续搭建</button>
+            <button class="ra-btn primary" @click="showResult = false">{{ buildMode === 'guide' ? '继续搭建' : '继续创作' }}</button>
+            <button v-if="buildMode === 'guide' && canEnterFreeMode" class="ra-btn accent" @click="showResult = false; buildMode !== 'free' && toggleBuildMode()">进入自由创作</button>
             <button class="ra-btn secondary" @click="clearAll(); showResult = false">重新开始</button>
           </div>
         </div>
@@ -190,6 +206,9 @@ const CHECKLIST = [
 
 const containerRef = ref(null);
 const selectedType = ref('foundation');
+const buildMode = ref('guide');
+const freeRotation = ref(0);
+const hoveredFreePoint = ref(null);
 const placedParts = ref([]);
 const showResult = ref(false);
 const resultScore = ref(0);
@@ -199,13 +218,23 @@ const hoveredSlot = ref(null);
 const placementHint = ref('先从柱础开始，也可以在已解锁的构件之间自由切换。');
 const placementState = ref('warn');
 
-const availableTypeIds = computed(() => PART_TYPES.filter((pt) => getAvailableSlots(pt.id).length > 0).map((pt) => pt.id));
-const availableTypeLabels = computed(() => availableTypeIds.value.length
-  ? PART_TYPES.filter((pt) => availableTypeIds.value.includes(pt.id)).map((pt) => pt.label).join('、')
-  : '所有安装点都已完成'
+const isGuidedPlacement = (part) => getSlots(part.type).some((slot) => slot.id === part.slotId);
+const availableTypeIds = computed(() => buildMode.value === 'free'
+  ? PART_TYPES.map((pt) => pt.id)
+  : PART_TYPES.filter((pt) => getAvailableSlots(pt.id).length > 0).map((pt) => pt.id)
 );
+const availableTypeLabels = computed(() => {
+  if (buildMode.value === 'free') return '全部构件自由可用';
+  return availableTypeIds.value.length
+    ? PART_TYPES.filter((pt) => availableTypeIds.value.includes(pt.id)).map((pt) => pt.label).join('、')
+    : '所有安装点都已完成';
+});
 const isMainStructureComplete = computed(() => ['foundation', 'pillar', 'beam', 'ridgebeam', 'roof'].every((key) => isChecklistDone(key)));
-const isPartHighlighted = (typeId) => selectedType.value === typeId || (hasUnlockedSlots(typeId) && !selectedType.value);
+const canEnterFreeMode = computed(() => isMainStructureComplete.value);
+const canSelectPart = (typeId) => buildMode.value === 'free' || hasUnlockedSlots(typeId);
+const isPartHighlighted = (typeId) => buildMode.value === 'free'
+  ? selectedType.value === typeId
+  : selectedType.value === typeId || (hasUnlockedSlots(typeId) && !selectedType.value);
 
 let renderer, scene, camera, controls, animId;
 let isSceneActive = true;
@@ -223,6 +252,14 @@ const mousePt = new THREE.Vector2();
 
 const getPartDef = (typeId) => PART_TYPES.find((p) => p.id === typeId);
 const getSlots = (typeId) => BUILD_SLOTS[typeId] || [];
+const getPartBaseY = (typeId, pointY = 0) => {
+  const pt = getPartDef(typeId);
+  if (!pt) return pointY;
+  if (typeId === 'dougong') return pointY + 3.42;
+  if (typeId === 'roof') return pointY + 4.94;
+  return pointY + pt.h / 2;
+};
+const snapToGrid = (value, step = 0.5) => Math.round(value / step) * step;
 const isSlotOccupied = (slotId) => placedParts.value.some((part) => part.slotId === slotId);
 const isSlotUnlocked = (slot) => {
   if (!slot.requires) return true;
@@ -233,10 +270,15 @@ const getAvailableSlots = (typeId) => getSlots(typeId).filter((slot) => !isSlotO
 const hasUnlockedSlots = (typeId) => getAvailableSlots(typeId).length > 0;
 const getProgress = (typeId) => ({ done: placedParts.value.filter((p) => p.type === typeId).length, total: getSlots(typeId).length });
 const getProgressText = (typeId) => {
+  if (buildMode.value === 'free') {
+    const freeCount = placedParts.value.filter((p) => p.type === typeId && p.mode === 'free').length;
+    return `${freeCount}件`;
+  }
   const { done, total } = getProgress(typeId);
   return `${done}/${total}`;
 };
 const isChecklistDone = (typeId) => {
+  if (buildMode.value === 'free') return false;
   const { done, total } = getProgress(typeId);
   return total > 0 && done >= total;
 };
@@ -295,6 +337,10 @@ const getNearestSlot = (typeId, x, z) => {
 
 const updateHelperRings = () => {
   helperRings.forEach((ring) => {
+    if (buildMode.value === 'free') {
+      ring.visible = false;
+      return;
+    }
     const available = !isSlotOccupied(ring.userData.slotId) && isSlotUnlocked(ring.userData.slot);
     const selectedMatches = !selectedType.value || ring.userData.partType === selectedType.value;
     ring.visible = available && selectedMatches;
@@ -310,6 +356,7 @@ const rebuildGhost = () => {
     ghostMesh = null;
   }
   hoveredSlot.value = null;
+  hoveredFreePoint.value = null;
   if (!selectedType.value) {
     updateHelperRings();
     return;
@@ -317,27 +364,57 @@ const rebuildGhost = () => {
 
   const pt = getPartDef(selectedType.value);
   ghostMesh = createPartMesh(pt, null, true);
+  ghostMesh.rotation.y = freeRotation.value;
   scene.add(ghostMesh);
   updateHelperRings();
 };
 
+const toggleBuildMode = () => {
+  if (!canEnterFreeMode.value) return;
+  buildMode.value = buildMode.value === 'guide' ? 'free' : 'guide';
+  hoveredSlot.value = null;
+  hoveredFreePoint.value = null;
+  freeRotation.value = 0;
+  const fallbackType = buildMode.value === 'free' ? PART_TYPES[0]?.id : availableTypeIds.value[0] ?? 'foundation';
+  if (!selectedType.value || !canSelectPart(selectedType.value)) selectedType.value = fallbackType;
+  updatePlacementHint(
+    buildMode.value === 'free'
+      ? '自由创作已开启：可在地面任意位置放置构件，按 Q / E 旋转方向。'
+      : '已返回教学搭建，请跟随高亮安装点继续完成标准房架。',
+    buildMode.value === 'free' ? 'ok' : 'warn'
+  );
+  audioSystem.playClick();
+  rebuildGhost();
+};
+
 const selectPart = (typeId) => {
-  if (!hasUnlockedSlots(typeId)) {
+  if (!canSelectPart(typeId)) {
     updatePlacementHint(`当前没有可放置的${getPartDef(typeId).label}安装点。`, 'warn');
     audioSystem.playClick();
     return;
   }
 
   selectedType.value = selectedType.value === typeId ? null : typeId;
-  if (selectedType.value) updatePlacementHint(`正在寻找${getPartDef(selectedType.value).label}的安装点。`, 'warn');
-  else updatePlacementHint('已取消当前构件，重新自由选择即可。', 'warn');
+  if (selectedType.value) {
+    updatePlacementHint(
+      buildMode.value === 'free'
+        ? `正在自由摆放${getPartDef(selectedType.value).label}，可按 Q / E 调整方向。`
+        : `正在寻找${getPartDef(selectedType.value).label}的安装点。`,
+      'warn'
+    );
+  } else updatePlacementHint('已取消当前构件，重新自由选择即可。', 'warn');
   audioSystem.playClick();
   rebuildGhost();
 };
 
 const cancelPlacement = () => {
   selectedType.value = null;
-  updatePlacementHint('已取消当前构件，重新自由选择即可。', 'warn');
+  updatePlacementHint(
+    buildMode.value === 'free'
+      ? '已取消当前构件，重新选择后可继续自由创作。'
+      : '已取消当前构件，重新自由选择即可。',
+    'warn'
+  );
   rebuildGhost();
 };
 
@@ -427,6 +504,7 @@ const createPartMesh = (ptDef, slot = null, isGhost = false) => {
 const placePart = (ptDef, slot) => {
   const mesh = createPartMesh(ptDef, slot, false);
   mesh.position.set(slot.x, slot.y, slot.z);
+  mesh.rotation.y = ((slot.rot ?? 0) * Math.PI) / 180;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.userData.partType = ptDef.id;
@@ -443,7 +521,7 @@ const placePart = (ptDef, slot) => {
   mesh.position.y = slot.y + dropH;
   scene.add(mesh);
   placedMeshes.push(mesh);
-  placedParts.value.push({ type: ptDef.id, mesh, slotId: slot.id, valid: true });
+  placedParts.value.push({ type: ptDef.id, mesh, slotId: slot.id, rotation: mesh.rotation.y, valid: true, mode: 'guide' });
   audioSystem.playSnap();
 
   const startY = mesh.position.y;
@@ -464,8 +542,64 @@ const placePart = (ptDef, slot) => {
     }
   });
 
-  if (!hasUnlockedSlots(selectedType.value)) selectedType.value = availableTypeIds.value[0] ?? null;
-  updatePlacementHint(`已安装${ptDef.label}，你可以继续自由补齐其他已解锁构件。`, 'ok');
+  if (buildMode.value === 'guide' && !hasUnlockedSlots(selectedType.value)) selectedType.value = availableTypeIds.value[0] ?? null;
+  updatePlacementHint(`已安装${ptDef.label}，${buildMode.value === 'free' ? '继续自由创作吧。' : '你可以继续自由补齐其他已解锁构件。'}`, 'ok');
+  rebuildGhost();
+};
+
+const placeFreePart = (ptDef, point) => {
+  const mesh = createPartMesh(ptDef, null, false);
+  const baseY = getPartBaseY(ptDef.id, point.y);
+  mesh.position.set(snapToGrid(point.x), baseY, snapToGrid(point.z));
+  mesh.rotation.y = freeRotation.value;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.partType = ptDef.id;
+  mesh.userData.slotId = null;
+
+  mesh.traverse((child) => {
+    if (child.isMesh) {
+      child.castShadow = true;
+      child.receiveShadow = true;
+    }
+  });
+
+  const dropH = ptDef.id === 'roof' ? 0.7 : 1.0;
+  mesh.position.y = baseY + dropH;
+  scene.add(mesh);
+  placedMeshes.push(mesh);
+  placedParts.value.push({
+    type: ptDef.id,
+    mesh,
+    slotId: null,
+    rotation: freeRotation.value,
+    x: mesh.position.x,
+    y: baseY,
+    z: mesh.position.z,
+    valid: true,
+    mode: 'free',
+  });
+  audioSystem.playSnap();
+
+  const startY = mesh.position.y;
+  const startT = performance.now();
+  const drop = () => {
+    const t = Math.min((performance.now() - startT) / 280, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    mesh.position.y = startY + (baseY - startY) * ease;
+    if (t < 1) requestAnimationFrame(drop);
+  };
+  drop();
+
+  mesh.traverse((child) => {
+    if (child.isMesh) {
+      child.material.emissive?.set('#ffcc44');
+      child.material.emissiveIntensity = 0.5;
+      setTimeout(() => { child.material.emissiveIntensity = child.material.transparent ? child.material.emissiveIntensity : 0; }, 400);
+    }
+  });
+
+  updatePlacementHint(`已放下${ptDef.label}，你可以继续在场地中自由创作。`, 'ok');
   rebuildGhost();
 };
 
@@ -479,8 +613,13 @@ const deleteHovered = () => {
   if (partIdx !== -1) placedParts.value.splice(partIdx, 1);
   hoveredMesh = null;
   audioSystem.playClick();
-  updatePlacementHint('已移除构件，可以重新选择任意已解锁安装点继续搭建。', 'warn');
-  if (selectedType.value && !hasUnlockedSlots(selectedType.value)) selectedType.value = availableTypeIds.value[0] ?? null;
+  updatePlacementHint(
+    buildMode.value === 'free'
+      ? '已移除构件，可以继续自由摆放新的组合。'
+      : '已移除构件，可以重新选择任意已解锁安装点继续搭建。',
+    'warn'
+  );
+  if (selectedType.value && !canSelectPart(selectedType.value)) selectedType.value = availableTypeIds.value[0] ?? null;
   rebuildGhost();
 };
 
@@ -493,23 +632,36 @@ const clearAll = () => {
   placedParts.value = [];
   hoveredMesh = null;
   hoveredSlot.value = null;
+  hoveredFreePoint.value = null;
+  buildMode.value = 'guide';
+  freeRotation.value = 0;
   selectedType.value = 'foundation';
   updatePlacementHint('先从柱础开始，也可以在已解锁的构件之间自由切换。', 'warn');
   rebuildGhost();
 };
 
 const getCompletionStatus = () => {
-  const foundationDone = isChecklistDone('foundation');
-  const pillarDone = isChecklistDone('pillar');
-  const beamDone = isChecklistDone('beam');
-  const ridgeDone = isChecklistDone('ridgebeam');
-  const roofDone = isChecklistDone('roof');
-  const dougongDone = isChecklistDone('dougong');
+  const guidedParts = placedParts.value.filter(isGuidedPlacement);
+  const foundationDone = guidedParts.filter((p) => p.type === 'foundation').length >= getSlots('foundation').length;
+  const pillarDone = guidedParts.filter((p) => p.type === 'pillar').length >= getSlots('pillar').length;
+  const beamDone = guidedParts.filter((p) => p.type === 'beam').length >= getSlots('beam').length;
+  const ridgeDone = guidedParts.filter((p) => p.type === 'ridgebeam').length >= getSlots('ridgebeam').length;
+  const roofDone = guidedParts.filter((p) => p.type === 'roof').length >= getSlots('roof').length;
+  const dougongDone = guidedParts.filter((p) => p.type === 'dougong').length >= getSlots('dougong').length;
   const score = [foundationDone, pillarDone, beamDone, ridgeDone, roofDone, dougongDone].filter(Boolean).length;
   return { foundationDone, pillarDone, beamDone, ridgeDone, roofDone, dougongDone, score };
 };
 
 const checkCompletion = () => {
+  if (buildMode.value === 'free') {
+    const freeCount = placedParts.value.filter((part) => part.mode === 'free').length;
+    resultScore.value = Math.min(5, Math.max(1, Math.ceil(freeCount / 3)));
+    resultTitle.value = freeCount >= 8 ? '创作渐入佳境' : freeCount >= 3 ? '雏形已现，继续发挥' : '开始你的自由构想';
+    resultDesc.value = `当前自由创作区已摆放 ${freeCount} 个构件。继续尝试不同组合，搭出属于你的房架样式。`;
+    showResult.value = true;
+    return;
+  }
+
   const status = getCompletionStatus();
   resultScore.value = status.score;
   if (status.score === 6) {
@@ -540,6 +692,11 @@ const checkCompletion = () => {
 const onKeyDown = (e) => {
   const key = e.key.toLowerCase();
   if (key === 'delete' || key === 'backspace') deleteHovered();
+  if (buildMode.value === 'free' && ghostMesh && (key === 'q' || key === 'e')) {
+    freeRotation.value += key === 'q' ? Math.PI / 8 : -Math.PI / 8;
+    ghostMesh.rotation.y = freeRotation.value;
+    updatePlacementHint(`已调整${getPartDef(selectedType.value)?.label ?? '构件'}方向，可继续放置。`, 'ok');
+  }
 };
 
 const onMouseMove = (e) => {
@@ -563,6 +720,7 @@ const onMouseMove = (e) => {
 
   if (!selectedType.value || !ghostMesh) {
     hoveredSlot.value = null;
+    hoveredFreePoint.value = null;
     updateHelperRings();
     return;
   }
@@ -571,12 +729,28 @@ const onMouseMove = (e) => {
   if (!groundHits.length) return;
 
   const pt = groundHits[0].point;
+
+  if (buildMode.value === 'free') {
+    hoveredSlot.value = null;
+    hoveredFreePoint.value = pt;
+    const snapX = snapToGrid(pt.x);
+    const snapZ = snapToGrid(pt.z);
+    const baseY = getPartBaseY(selectedType.value, pt.y);
+    ghostMesh.position.set(snapX, baseY, snapZ);
+    ghostMesh.rotation.y = freeRotation.value;
+    ghostMesh.userData._baseY = baseY;
+    setObjectMaterialState(ghostMesh, { opacity: 0.45, emissive: '#66aaff' });
+    updatePlacementHint(`自由摆放${getPartDef(selectedType.value).label}中，点击即可落位。`, 'ok');
+    updateHelperRings();
+    return;
+  }
+
   const nearestSlot = getNearestSlot(selectedType.value, pt.x, pt.z);
+  hoveredFreePoint.value = null;
   hoveredSlot.value = nearestSlot;
 
   if (!nearestSlot) {
-    const selectedPart = getPartDef(selectedType.value);
-    const freeY = selectedPart.id === 'roof' ? 4.9 : selectedPart.id === 'dougong' ? 3.42 : selectedPart.h / 2;
+    const freeY = getPartBaseY(selectedType.value, pt.y);
     setObjectMaterialState(ghostMesh, { opacity: 0.2, emissive: '#aa3333' });
     ghostMesh.position.set(pt.x, freeY, pt.z);
     ghostMesh.userData._baseY = freeY;
@@ -586,6 +760,7 @@ const onMouseMove = (e) => {
   }
 
   ghostMesh.position.set(nearestSlot.x, nearestSlot.y, nearestSlot.z);
+  ghostMesh.rotation.y = ((nearestSlot.rot ?? 0) * Math.PI) / 180;
   ghostMesh.userData._baseY = nearestSlot.y;
 
   setObjectMaterialState(ghostMesh, { opacity: 0.5, emissive: '#66aaff' });
@@ -595,6 +770,16 @@ const onMouseMove = (e) => {
 
 const onCanvasClick = () => {
   if (!selectedType.value) return;
+  if (buildMode.value === 'free') {
+    if (!hoveredFreePoint.value) {
+      updatePlacementHint('请将构件移动到场地内再放下。', 'warn');
+      audioSystem.playClick();
+      return;
+    }
+    placeFreePart(getPartDef(selectedType.value), hoveredFreePoint.value);
+    return;
+  }
+
   if (!hoveredSlot.value) {
     updatePlacementHint('此处没有可用安装点，请靠近高亮位置。', 'warn');
     audioSystem.playClick();
@@ -822,6 +1007,8 @@ onBeforeUnmount(() => {
 .part-label { color: #f1ddb1; font-size: 14px; }
 .part-label small { font-size: 11px; color: rgba(240, 208, 128, 0.58); }
 .part-count { color: rgba(204, 173, 114, 0.62); font-size: 12px; margin-top: 3px; }
+.mode-toggle-btn { width: 100%; margin: -2px 0 14px; padding: 11px 14px; border: 1px solid rgba(240, 208, 128, 0.36); border-radius: 14px; background: linear-gradient(135deg, rgba(126, 83, 34, 0.95), rgba(72, 44, 16, 0.95)); color: #f8e4aa; cursor: pointer; transition: all 0.2s; }
+.mode-toggle-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 20px rgba(0, 0, 0, 0.22); }
 .palette-divider { height: 1px; background: linear-gradient(90deg, transparent, rgba(200, 154, 90, 0.25), transparent); margin: 18px 0; }
 .quick-tips p { margin: 8px 0; font-size: 13px; color: rgba(222, 197, 142, 0.76); line-height: 1.5; }
 .clear-btn { width: 100%; padding: 12px 16px; border: 1px solid rgba(200, 154, 90, 0.35); border-radius: 14px; background: rgba(104, 50, 20, 0.22); color: #efc887; cursor: pointer; transition: all 0.2s; }
@@ -835,10 +1022,13 @@ onBeforeUnmount(() => {
 .placement-message.warn { border-color: rgba(200, 154, 90, 0.3); }
 .placing-indicator, .canvas-hint-top { position: absolute; top: 20px; right: 20px; z-index: 6; border-radius: 999px; padding: 10px 16px; color: #f5ddaa; display: flex; align-items: center; gap: 10px; }
 .placing-dot { width: 10px; height: 10px; background: #f0d080; border-radius: 50%; box-shadow: 0 0 8px rgba(240, 208, 128, 0.8); }
+.rotation-chip { padding: 4px 10px; border-radius: 999px; background: rgba(240, 208, 128, 0.12); color: #f8e6b6; font-size: 12px; }
 .cancel-place { border: none; background: rgba(255, 255, 255, 0.08); color: #f5ddaa; border-radius: 999px; padding: 5px 10px; cursor: pointer; }
 .svg-wrap { padding: 14px; border-radius: 14px; background: radial-gradient(circle at top, rgba(73, 48, 18, 0.45), rgba(13, 10, 6, 0.96)); border: 1px solid rgba(200, 154, 90, 0.14); }
 .bp-svg { width: 100%; display: block; }
 .checklist { display: flex; flex-direction: column; gap: 10px; }
+.free-notes { display: flex; flex-direction: column; gap: 10px; padding: 2px 2px 0; }
+.free-notes p { margin: 0; line-height: 1.7; color: rgba(233, 212, 166, 0.78); font-size: 13px; }
 .check-item { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.03); color: rgba(233, 212, 166, 0.72); border: 1px solid transparent; }
 .check-item.current { border-color: rgba(240, 208, 128, 0.22); }
 .check-item.done { background: rgba(116, 90, 34, 0.3); color: #f4dd9a; }
@@ -859,6 +1049,7 @@ onBeforeUnmount(() => {
 .result-actions { display: flex; gap: 12px; justify-content: center; }
 .ra-btn { padding: 10px 18px; border-radius: 999px; border: none; cursor: pointer; }
 .ra-btn.primary { background: linear-gradient(135deg, #d0a564, #8d5a2f); color: #fff; }
+.ra-btn.accent { background: linear-gradient(135deg, #f0d080, #b67a2d); color: #2d1b0d; }
 .ra-btn.secondary { background: rgba(255, 255, 255, 0.08); color: #f5ddaa; }
 .pop-enter-active, .pop-leave-active { transition: opacity 0.25s ease, transform 0.25s ease; }
 .pop-enter-from, .pop-leave-to { opacity: 0; transform: scale(0.96); }
