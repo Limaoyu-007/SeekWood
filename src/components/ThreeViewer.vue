@@ -75,6 +75,9 @@ const tutorialTipText = ref("");
 
 // ── Three.js 核心 ──────────────────────────────────────────────
 let renderer, scene, camera, controls, animationId;
+let isSceneActive = true;
+let lastFrameTime = 0;
+const FRAME_INTERVAL = 1000 / 30;
 
 // ── 多件系统 ──────────────────────────────────────────────────
 // 每件：{ mesh: Group, target: Vector3, targetRotY: Number,
@@ -112,7 +115,7 @@ const initThree = () => {
 
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(W, H);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.shadowMap.enabled  = true;
   renderer.shadowMap.type     = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace   = THREE.SRGBColorSpace;
@@ -146,6 +149,7 @@ const initThree = () => {
   el.addEventListener('wheel',     onWheel, { passive: false });
   window.addEventListener('resize',  onWindowResize);
   window.addEventListener('keydown', onKeyDown);
+  document.addEventListener('visibilitychange', onVisibilityChange);
 
   isLoading.value = false;
   
@@ -414,16 +418,24 @@ const onWindowResize = () => {
   renderer.setSize(W, H);
 };
 
+const onVisibilityChange = () => {
+  isSceneActive = document.visibilityState === 'visible';
+};
+
 
 // ═══════════════════════════════════════════════════════════════
 //  动画循环（引导息动画：仅首次未移动时）
 // ═══════════════════════════════════════════════════════════════
-const animate = () => {
+const animate = (now = 0) => {
   animationId = requestAnimationFrame(animate);
+  if (!isSceneActive) return;
+  if (now - lastFrameTime < FRAME_INTERVAL) return;
+  lastFrameTime = now;
+
   controls.update();
 
   if (!allTriggered.value && !hasPlayerMoved) {
-    const breath = Math.sin(Date.now() * 0.0015) * 0.1;
+    const breath = Math.sin(now * 0.0015) * 0.1;
     pieces.forEach(p => {
       if (p.placed) return;
       if (BREATH_AXIS === 'y') {
@@ -451,6 +463,7 @@ onBeforeUnmount(() => {
   el?.removeEventListener('wheel',     onWheel);
   window.removeEventListener('resize',  onWindowResize);
   window.removeEventListener('keydown', onKeyDown);
+  document.removeEventListener('visibilitychange', onVisibilityChange);
   controls?.dispose();
   renderer?.dispose();
 });

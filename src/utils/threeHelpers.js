@@ -82,10 +82,10 @@ export const buildLights = (scene) => {
   dir.position.set(6, 12, 8);
   dir.castShadow = true;
   dir.shadow.mapSize.set(2048, 2048);
-  dir.shadow.camera.left   = dir.shadow.camera.bottom = -12;
-  dir.shadow.camera.right  = dir.shadow.camera.top    =  12;
-  dir.shadow.camera.near   = 1;
-  dir.shadow.camera.far    = 40;
+  dir.shadow.camera.left = dir.shadow.camera.bottom = -12;
+  dir.shadow.camera.right = dir.shadow.camera.top = 12;
+  dir.shadow.camera.near = 1;
+  dir.shadow.camera.far = 40;
   scene.add(dir);
 
   const fill = new THREE.DirectionalLight('#d08040', 0.5);
@@ -97,7 +97,7 @@ export const buildLights = (scene) => {
  * 添加通用场景地面
  */
 export const buildGround = (scene) => {
-  const mat  = new THREE.MeshStandardMaterial({ color: '#1e150a', roughness: 0.95 });
+  const mat = new THREE.MeshStandardMaterial({ color: '#1e150a', roughness: 0.95 });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), mat);
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.y = -1.5;

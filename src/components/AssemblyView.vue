@@ -197,6 +197,11 @@ const targetSnapY   = ref(0); // 实时计算的吸附高度
 
 // ── Three.js 变量 ───────────────────────────────────────────────
 let renderer, scene, camera, controls, animId;
+let isSceneActive = true;
+let lastFrameTime = 0;
+let lastRenderTime = 0;
+const FRAME_INTERVAL = 1000 / 30;
+const RENDER_INTERVAL = 1000 / 24;
 let ghostMesh     = null;   // 放置预览虚影
 let floorPlane    = null;   // 射线检测地面
 let hoveredMesh   = null;   // 当前悬停中的已放置构件
@@ -236,7 +241,7 @@ onMounted(() => {
 
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(W, H);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -271,6 +276,7 @@ onMounted(() => {
   canvas.addEventListener('mousemove', onMouseMove);
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('resize', onResize);
+  document.addEventListener('visibilitychange', onVisibilityChange);
 
   animate();
 });
@@ -283,6 +289,7 @@ onBeforeUnmount(() => {
   canvas?.removeEventListener('mousemove', onMouseMove);
   window.removeEventListener('keydown', onKeyDown);
   window.removeEventListener('resize', onResize);
+  document.removeEventListener('visibilitychange', onVisibilityChange);
   controls?.dispose();
   renderer?.dispose();
 });
@@ -553,17 +560,27 @@ const onResize = () => {
   renderer.setSize(W, H);
 };
 
+const onVisibilityChange = () => {
+  isSceneActive = document.visibilityState === 'visible';
+};
+
 // ── 动画循环 ────────────────────────────────────────────────────
-const animate = () => {
+const animate = (now = 0) => {
   animId = requestAnimationFrame(animate);
+  if (!isSceneActive) return;
+  if (now - lastFrameTime < FRAME_INTERVAL) return;
+  lastFrameTime = now;
+
   controls.update();
 
   // 虚影悬浮动效（使用赋值而非累加，避免漂移）
   if (ghostMesh) {
     ghostMesh.userData._baseY = ghostMesh.userData._baseY ?? ghostMesh.position.y;
-    ghostMesh.position.y = ghostMesh.userData._baseY + Math.sin(Date.now() * 0.003) * 0.06;
+    ghostMesh.position.y = ghostMesh.userData._baseY + Math.sin(now * 0.003) * 0.06;
   }
 
+  if (now - lastRenderTime < RENDER_INTERVAL) return;
+  lastRenderTime = now;
   renderer.render(scene, camera);
 };
 </script>

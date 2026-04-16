@@ -110,14 +110,14 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
-import ThreeViewer   from './components/ThreeViewer.vue';
-import AIChatBox     from './components/AIChatBox.vue';
-import GuideView     from './components/GuideView.vue';
-import AssemblyView  from './components/AssemblyView.vue';
-import IntroSplash   from './components/IntroSplash.vue';
-import BuildingRepairView from './components/BuildingRepairView.vue';
-import StoryOverlay from './components/StoryOverlay.vue';
+import { ref, computed, watch, defineAsyncComponent } from 'vue';
+const ThreeViewer = defineAsyncComponent(() => import('./components/ThreeViewer.vue'));
+const AIChatBox = defineAsyncComponent(() => import('./components/AIChatBox.vue'));
+const GuideView = defineAsyncComponent(() => import('./components/GuideView.vue'));
+const AssemblyView = defineAsyncComponent(() => import('./components/AssemblyView.vue'));
+const IntroSplash = defineAsyncComponent(() => import('./components/IntroSplash.vue'));
+const BuildingRepairView = defineAsyncComponent(() => import('./components/BuildingRepairView.vue'));
+const StoryOverlay = defineAsyncComponent(() => import('./components/StoryOverlay.vue'));
 import { audioSystem } from './utils/audioSystem';
 import { store, addJoint, setPhase, resetStore } from './store';
 
