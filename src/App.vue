@@ -37,7 +37,7 @@
           <div class="nav-btn-group">
             <button class="nav-btn" @click="currentView = 'guide'">📖 图鉴</button>
             <button class="nav-btn accent" @click="currentView = 'assembly'">🏗 自由建造</button>
-            <button class="nav-btn accent" @click="currentView = 'repair'" style="border-color: rgba(200,80,60,0.5); color: #ffbba0;">🏛 造办处</button>
+            <button class="nav-btn accent" @click="currentView = 'repair'" style="border-color: rgba(200,80,60,0.5); color: #ffbba0;">🏛 经典复原</button>
             <!-- 新增：音乐开关 -->
             <button 
               class="nav-btn music-toggle" 
