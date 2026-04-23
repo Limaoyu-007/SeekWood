@@ -600,7 +600,30 @@ onBeforeUnmount(() => {
   pointer-events: none; backdrop-filter: blur(8px); z-index: 5; white-space: nowrap;
 }
 .hint-panel b { color: #e8c060; }
+/* 关卡提示：按钮可点击 */
+.level-hint-wrap { margin-top: 6px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 
+.level-hint-btn {
+  border: 1px solid rgba(200,150,60,0.35);
+  background: rgba(0,0,0,0.18);
+  color: #e8c060;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.level-hint-btn:hover { background: rgba(139,90,30,0.35); }
+
+.level-hint-text {
+  width: 280px;
+  max-width: min(72vw, 320px);
+  background: rgba(10,7,3,0.72);
+  border: 1px solid rgba(200,150,60,0.25);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.level-hint-pre { margin: 0; font-family: inherit; font-size: 12px; line-height: 1.7; }
 /* 多件进度 */
 .progress-bar {
   position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
