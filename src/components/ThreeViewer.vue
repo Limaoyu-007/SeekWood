@@ -20,6 +20,16 @@
         <p>🖱️ 悬停后<b>滚轮</b>调整前后深度</p>
       </template>
       <p>🔄 <b>右键</b>旋转视角 &nbsp;|&nbsp; <b>R/E</b> 旋转榫头 ±45°</p>
+      <div class="level-hint-wrap">
+  <button class="level-hint-btn" @click="showLevelHint = !showLevelHint">
+    {{ showLevelHint ? '✕ 收起提示' : '❔ 关卡提示' }}
+  </button>
+
+  <div v-if="showLevelHint" class="level-hint-text">
+    <div class="level-hint-title">本关操作核心</div>
+    <pre class="level-hint-pre">{{ levelHintText }}</pre>
+  </div>
+</div>
     </div>
 
     <!-- 进度指示（多件关卡） -->
@@ -50,7 +60,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { buildLevel } from './ThreeLevelFactory';
@@ -72,6 +82,99 @@ const allTriggered = ref(false);
 // ── 教程状态 ─────────────────────────────────────────────
 const showTutorialTip = ref(false);
 const tutorialTipText = ref("");
+const showLevelHint = ref(false);
+
+const levelHintText = computed(() => {
+  switch (props.level.type) {
+  case 'straight':
+    return [
+      '直榫关键：对正 + 推深度',
+      '1) 把榫头对准卯眼中心（先对齐位置）',
+      '2) 用滚轮一点点推进深度，直到“咔哒”吸附',
+      '3) 若推进方向不对，先右键换个视角再推',
+    ].join('\n');
+
+  case 'dovetail':
+    return [
+      '燕尾榫关键：先旋回正 + 侧向推入',
+      '1) 先按 R 把榫头旋转回正方向（必要步骤）',
+      '2) 从侧面把榫头对准卯口，不要从正面硬怼',
+      '3) 用滚轮推进深度，保持侧向平推直到吸附',
+    ].join('\n');
+
+  case 'crosslap':
+    return [
+      '十字搭接关键：两梁“交叉对齐”',
+      '1) 先让两构件在平面上对齐成“十字”',
+      '2) 再用滚轮微调深度，让缺口完全咬合',
+      '3) 若总是卡住：先右键换视角，确认是不是偏了一点点',
+    ].join('\n');
+
+  case 'doubletenon':
+    return [
+      '双榫关键：两榫同时对孔',
+      '1) 先把整体位置对齐到两个卯眼之间的中线',
+      '2) 再用滚轮推进深度，让两边同时进入',
+      '3) 如一边先进一边卡：退一点点，重新对中再推',
+    ].join('\n');
+
+  case 'twojoint':
+    return [
+      '双联卯眼关键：分件处理 + 右侧先旋转',
+      '1) 两个榫头要分别进各自卯眼（别只盯一个孔）',
+      '2) 右侧榫头先按 R 旋转 90° 再插入',
+      '3) 建议先完成一个榫头，再处理另一个（不要同时推哦）',
+    ].join('\n');
+
+  case 'stoppedDovetail':
+    return [
+      '半隐燕尾榫关键：找“进入方向”',
+      '1) 先判断哪一侧是开口/进入方向（看卯口的可进面）',
+      '2) 位置对齐后，用滚轮沿进入方向推进',
+      '3) 卡住就先退一点点，微调角度（R/E）再推入',
+    ].join('\n');
+
+  case 'miteredCorner':
+    return [
+      '粽角榫关键：45°转角合缝',
+      '1) 先让外侧边缘看起来“贴边合缝” ',
+      '2) 再推深度让转角完全咬合',
+      '3) 角度不对就用 R/E 调整（多尝试几个角度哦）',
+    ].join('\n');
+
+  case 'cloudJoint':
+    return [
+      '勾挂榫关键：先挂住，再推紧',
+      '1) 先把“钩”的位置对到受力挂点（先挂上那一下）',
+      '2) 再用滚轮推进，让整体扣紧到位',
+      '3) if总是滑开：先右键换角度，确保钩位真的对上',
+    ].join('\n');
+
+  case 'paWangJoint':
+    return [
+      '霸王枨关键：先对“曲线卡位”，再楔紧',
+      '1) 先调整视角找到所有组件（注意有一大一小两个组件哦）',
+      '2) 点击大组件从主体侧面推进',
+      '3) 小组件最佳吸附位置位于大组件垂直线上（若很难吸附：说明对位偏了，退一点重新对准再推）',
+    ].join('\n');
+
+  case 'lubanLock':
+    return [
+      '鲁班三才锁关键：顺序 + 三向对齐',
+      '1) 先把长直部件对齐到“中轴”位置',
+      '2) 逐步推进另一组件，适当按R键调整角度',
+      '3) 卡住就退一点，微调位置/深度后再推进（切记不要硬推）',
+    ].join('\n');
+
+  default:
+    return [
+      '通用关键：先对齐位置，再推进深度',
+      '1) 拖拽对准卯眼',
+      '2) 滚轮推进/拉出微调深度',
+      '3) R/E 调角度，右键换视角',
+    ].join('\n');
+}
+});
 
 // ── Three.js 核心 ──────────────────────────────────────────────
 let renderer, scene, camera, controls, animationId;
