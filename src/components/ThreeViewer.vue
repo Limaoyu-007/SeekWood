@@ -624,6 +624,16 @@ onBeforeUnmount(() => {
 }
 
 .level-hint-pre { margin: 0; font-family: inherit; font-size: 12px; line-height: 1.7; }
+/* 让操作提示文字不拦截鼠标（点穿到 3D） */
+.hint-panel p { pointer-events: none; }
+/* 关卡提示按钮/展开区需要可点击 */
+.level-hint-wrap,
+.level-hint-btn,
+.level-hint-text { pointer-events: auto; }
+￼
+/* 关卡提示文字允许换行 */
+.level-hint-text { white-space: normal; }
+.level-hint-pre  { white-space: pre-wrap; }
 /* 多件进度 */
 .progress-bar {
   position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
