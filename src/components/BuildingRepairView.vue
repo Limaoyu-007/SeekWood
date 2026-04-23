@@ -1,7 +1,7 @@
 <template>
   <div class="repair-container">
     <div class="top-nav">
-      <button class="back-btn" @click="$emit('back')">← 退出造办处</button>
+      <button class="back-btn" @click="$emit('back')">← 退出经典复原模式</button>
       <div class="title-group">
         <h2 class="building-title">【大匠造办】{{ currentChapter.name }}</h2>
         <p class="chapter-subtitle">{{ currentChapter.subtitle }}</p>
